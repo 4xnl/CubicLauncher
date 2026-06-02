@@ -271,13 +271,13 @@
 					<span
 						class="qm-themes-hint"
 						onclick={() =>
-							openUrl("https://github.com/CubicLauncher/Themes")}
+							openUrl("https://www.cubiclauncher.com/themes")}
 						role="link"
 						tabindex="0"
 						onkeydown={(e) => {
 							if (e.key === "Enter")
 								openUrl(
-									"https://github.com/CubicLauncher/Themes",
+									"https://www.cubiclauncher.com/themes",
 								);
 						}}>{t("settings.launcher.themesSpan")}</span
 					>
@@ -304,19 +304,6 @@
 						/>
 						<label for="auto-updates"
 							>{t("settings.launcher.autoUpdates")}</label
-						>
-					</div>
-					<div class="qm-field-checkbox">
-						<input
-							type="checkbox"
-							id="close-on-play"
-							bind:checked={
-								launcherStore.settings.close_launcher_on_play
-							}
-							onchange={handleSave}
-						/>
-						<label for="close-on-play"
-							>{t("settings.launcher.closeOnPlay")}</label
 						>
 					</div>
 					<div class="qm-field-checkbox">
