@@ -80,6 +80,11 @@
 		"createInstance": "Create Instance",
 		"downloadVersions": "Download Versions",
 		"settings": "Settings",
+		"tools": "Tools",
+		"downloading": "downloading",
+		"completed": "completed",
+		"noDownloads": "No downloads",
+		"noDownloadDesc": "Downloaded versions will appear here",
 		"modals": {
 			"editTitle": "Edit Instance",
 			"nameLabel": "Name",
@@ -260,7 +265,8 @@
 			"snapshots": "Snapshots",
 			"alphas": "Alphas",
 			"fabric": "Fabric"
-		}
+		},
+		"downloading": "Downloading..."
 	},
 	"themes": {
 		"warning": {

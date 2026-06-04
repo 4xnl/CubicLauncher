@@ -80,6 +80,11 @@
 		"createInstance": "Crear Instancia",
 		"downloadVersions": "Descargar Versiones",
 		"settings": "Ajustes",
+		"tools": "Herramientas",
+		"downloading": "descargando",
+		"completed": "completadas",
+		"noDownloads": "Sin descargas",
+		"noDownloadDesc": "Las versiones descargadas aparecerán aquí",
 		"modals": {
 			"editTitle": "Editar Instancia",
 			"nameLabel": "Nombre",
@@ -97,7 +102,7 @@
 		"title": "Perfil de Usuario",
 		"usernameLabel": "Nombre de Usuario",
 		"usernamePlaceholder": "Usuario",
-		"offline": "Desconectado",
+		"offline": "No Premium",
 		"cancel": "Cancelar",
 		"save": "Guardar",
 		"changeNameBtn": "Cambiar Nombre",
@@ -256,11 +261,12 @@
 			"fabricStability": "Estabilidad"
 		},
 		"tabs": {
-			"releases": "Releases",
+			"releases": "Lanzamientos",
 			"snapshots": "Snapshots",
 			"alphas": "Alphas",
 			"fabric": "Fabric"
-		}
+		},
+		"downloading": "Descargando..."
 	},
 	"themes": {
 		"warning": {
