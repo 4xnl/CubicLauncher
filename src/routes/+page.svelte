@@ -30,7 +30,6 @@
 	let VersionDownloaderComponent = $state<Component<{
 		onclose?: () => void;
 	}> | null>(null);
-	let DownloadProgressBarComponent = $state<Component | null>(null);
 
 	onMount(async () => {
 		initEventListeners();
@@ -54,11 +53,9 @@
 		Promise.all([
 			import("$lib/components/settings/Settings.svelte"),
 			import("$lib/components/layout/VersionDownloader.svelte"),
-			import("$lib/components/ui/DownloadProgressBar.svelte"),
-		]).then(([s, v, d]) => {
+		]).then(([s, v]) => {
 			SettingsComponent = s.default;
 			VersionDownloaderComponent = v.default;
-			DownloadProgressBarComponent = d.default;
 		});
 	});
 
@@ -67,7 +64,14 @@
 		const sel = selectedInstance;
 		if (sel) {
 			const updated = instances.find((i) => i.uuid === sel.uuid);
-			if (updated && updated !== sel) {
+			if (
+				updated &&
+				(updated.status !== sel.status ||
+					updated.name !== sel.name ||
+					updated.loader !== sel.loader ||
+					updated.version !== sel.version ||
+					updated.last_played !== sel.last_played)
+			) {
 				selectedInstance = updated;
 			}
 		}
@@ -114,5 +118,3 @@
 <CreateInstanceModal bind:open={openCreateModal} />
 
 <NotificationContainer />
-
-<DownloadProgressBarComponent />
