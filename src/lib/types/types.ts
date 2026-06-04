@@ -92,6 +92,12 @@ export interface Notification {
 	totalMb?: number;
 }
 
+export interface McVersion {
+	loader: "vanilla" | "fabric" | "forge" | "neoforge";
+	version: string;
+	type: string;
+}
+
 export interface MinecraftVersion {
 	id: string;
 	type: string;

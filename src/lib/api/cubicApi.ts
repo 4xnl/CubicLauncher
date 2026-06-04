@@ -9,6 +9,7 @@ import {
 	type ModrinthSearchResult,
 	type ModrinthVersion,
 	type JreStatus,
+	type McVersion,
 } from "../types/types";
 import { invoke } from "@tauri-apps/api/core";
 import { showError } from "../state/state.svelte";
@@ -97,6 +98,28 @@ export async function getInstalledVersions(): Promise<string[]> {
 		console.error("Error al obtener versiones instaladas:", err);
 		return [];
 	}
+}
+
+export function parseInstalledVersion(raw: string): McVersion {
+	if (raw.startsWith("fabric-loader-")) {
+		const mcVersion = raw.replace(/^fabric-loader-[\d.]+-/, "");
+		return { loader: "fabric", version: mcVersion, type: "" };
+	}
+	return { loader: "vanilla", version: raw, type: "" };
+}
+
+export function getInstalledMcVersions(raw: string[]): {
+	vanilla: Set<string>;
+	fabric: Set<string>;
+} {
+	const vanilla = new Set<string>();
+	const fabric = new Set<string>();
+	for (const v of raw) {
+		const parsed = parseInstalledVersion(v);
+		if (parsed.loader === "vanilla") vanilla.add(parsed.version);
+		else if (parsed.loader === "fabric") fabric.add(parsed.version);
+	}
+	return { vanilla, fabric };
 }
 
 export async function getInstanceMods(id: string): Promise<ModDto[]> {
