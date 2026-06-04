@@ -101,9 +101,11 @@ export async function getInstalledVersions(): Promise<string[]> {
 }
 
 export function parseInstalledVersion(raw: string): McVersion {
-	if (raw.startsWith("fabric-loader-")) {
-		const mcVersion = raw.replace(/^fabric-loader-[\d.]+-/, "");
-		return { loader: "fabric", version: mcVersion, type: "" };
+	if (raw.includes("fabric")) {
+		const clean = raw
+			.replace(/^fabric-loader-[\d.]+-/, "")
+			.replace(/-fabric$/, "");
+		return { loader: "fabric", version: clean, type: "" };
 	}
 	return { loader: "vanilla", version: raw, type: "" };
 }
