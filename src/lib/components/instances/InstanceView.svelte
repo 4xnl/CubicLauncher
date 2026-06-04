@@ -271,11 +271,15 @@
 			</div>
 		{:else if activeTab === "mods"}
 			<div class="tab-pane">
-				<ModsRow instanceId={selectedInstance.uuid} />
+				{#key selectedInstance.uuid}
+					<ModsRow instanceId={selectedInstance.uuid} />
+				{/key}
 			</div>
 		{:else if activeTab === "download_mods"}
 			<div class="tab-pane">
-				<DownloadMods instance={selectedInstance} />
+				{#key selectedInstance.uuid}
+					<DownloadMods instance={selectedInstance} />
+				{/key}
 			</div>
 		{:else if activeTab === "resources"}
 			<div class="tab-pane">

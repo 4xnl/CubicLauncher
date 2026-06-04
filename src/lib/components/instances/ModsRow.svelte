@@ -5,9 +5,11 @@
 
 	let { instanceId } = $props<{ instanceId: string }>();
 	let mods = $state<ModDto[]>([]);
+	let prevInstanceId = $state<string>("");
 
 	$effect(() => {
-		if (instanceId) {
+		if (instanceId && instanceId !== prevInstanceId) {
+			prevInstanceId = instanceId;
 			getInstanceMods(instanceId).then((data) => {
 				mods = data;
 			});
