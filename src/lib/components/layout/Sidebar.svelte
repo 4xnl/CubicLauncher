@@ -1,12 +1,16 @@
 <script lang="ts">
-	import { getInstalledVersions } from "$lib/api/cubicApi";
+	import { onMount } from "svelte";
+	import { slide } from "svelte/transition";
+	import { listen } from "@tauri-apps/api/event";
+	import { getInstalledVersions, getDownloadQueue } from "$lib/api/cubicApi";
 	import { INSTANCE_LOGOS } from "$lib/icons/logos";
 	import { deleteInst, updateInst } from "$lib/api/launcherService";
 	import { launcherStore } from "$lib/state/state.svelte";
-	import type { InstanceDto } from "$lib/types/types";
+	import type { InstanceDto, AppEvent } from "$lib/types/types";
 	import UserMenu from "./UserMenu.svelte";
 	import ModalBase from "./ModalBase.svelte";
 	import Select from "./Select.svelte";
+	import CollapsibleSection from "$lib/components/settings/CollapsibleSection.svelte";
 	import { t } from "$lib/i18n";
 
 	interface Props {
@@ -35,6 +39,132 @@
 	let versionOptions = $derived(
 		installedVersions.map((v) => ({ value: v, label: v })),
 	);
+
+	// ── Download Queue ────────────────────────────────────────────────────
+
+	type SegKey = "Library" | "Asset" | "Native" | "Client";
+	const SEGS: SegKey[] = ["Library", "Asset", "Native", "Client"];
+
+	interface SegProg {
+		current: number;
+		total: number;
+	}
+	interface DlItem {
+		version: string;
+		activeType: SegKey | null;
+		segs: Record<SegKey, SegProg>;
+		done: boolean;
+	}
+
+	function emptySegs(): Record<SegKey, SegProg> {
+		return {
+			Library: { current: 0, total: 0 },
+			Asset: { current: 0, total: 0 },
+			Native: { current: 0, total: 0 },
+			Client: { current: 0, total: 0 },
+		};
+	}
+
+	let downloads = $state<Map<string, DlItem>>(new Map());
+	let downloadsOpen = $state(false);
+	let activeCount = $derived(
+		[...downloads.values()].filter((d) => !d.done).length,
+	);
+	let doneCount = $derived(
+		[...downloads.values()].filter((d) => d.done).length,
+	);
+	function pct(segs: Record<SegKey, SegProg>): number {
+		const totalAll = SEGS.reduce((a, k) => a + segs[k].total, 0);
+		const curAll = SEGS.reduce((a, k) => a + segs[k].current, 0);
+		return totalAll > 0 ? Math.round((curAll / totalAll) * 100) : 0;
+	}
+
+	function toggleDownloads() {
+		downloadsOpen = !downloadsOpen;
+	}
+
+	onMount(() => {
+		getDownloadQueue().then((queue) => {
+			for (const item of queue) {
+				if (!downloads.has(item.version)) {
+					downloads.set(item.version, {
+						version: item.version,
+						activeType: null,
+						segs: emptySegs(),
+						done: item.status === "done",
+					});
+				}
+			}
+			if (queue.length > 0) {
+				downloads = new Map(downloads);
+				downloadsOpen = true;
+			}
+		});
+
+		const unlisten = listen<AppEvent>("app-event", (event) => {
+			const p = event.payload;
+			switch (p.type) {
+				case "DEnqueue": {
+					const { version } = p.data;
+					if (!downloads.has(version)) {
+						downloads.set(version, {
+							version,
+							activeType: null,
+							segs: emptySegs(),
+							done: false,
+						});
+						downloads = new Map(downloads);
+						downloadsOpen = true;
+					}
+					break;
+				}
+				case "DProgress": {
+					const { version, current, total, d_type } = p.data;
+					const existing = downloads.get(version) ?? {
+						version,
+						activeType: null,
+						segs: emptySegs(),
+						done: false,
+					};
+					const key = SEGS.includes(d_type as SegKey)
+						? (d_type as SegKey)
+						: existing.activeType ?? "Library";
+					const newSegs = { ...existing.segs, [key]: { current, total } };
+					downloads.set(version, {
+						...existing,
+						segs: newSegs,
+						activeType: key,
+						done: false,
+					});
+					downloads = new Map(downloads);
+					break;
+				}
+				case "DFinish": {
+					const { version } = p.data;
+					const item = downloads.get(version);
+					if (item) {
+						downloads.set(version, {
+							...item,
+							done: true,
+							activeType: null,
+						});
+						downloads = new Map(downloads);
+					}
+					setTimeout(() => {
+						downloads.delete(version);
+						downloads = new Map(downloads);
+					}, 4000);
+					break;
+				}
+			}
+		});
+
+		return () => {
+			unlisten.then((u) => u());
+		};
+	});
+
+	// ── Instance CRUD ─────────────────────────────────────────────────────
 
 	async function openRenameModal(instance: InstanceDto) {
 		instanceToActOn = instance;
@@ -171,79 +301,202 @@
 		</div>
 	</div>
 
-	<div class="sidebar-footer">
-		<button type="button" class="footer-btn" onclick={onopencreateinstance}>
-			<img
-				src="/images/icons/create.svg"
-				alt=""
-				width="16"
-				height="16"
-				style="filter: var(--icon-filter);"
-			/>
-			{t("sidebar.createInstance")}
-		</button>
+	<div class="sidebar-sections">
+	<div class="sd-root">
 		<button
 			type="button"
-			class="footer-btn"
-			onclick={onopenversiondownloader}
+			class="sd-header"
+			class:expanded={downloadsOpen}
+			onclick={toggleDownloads}
+			aria-expanded={downloadsOpen}
 		>
-			<img
-				src="/images/icons/download.svg"
-				alt=""
-				width="16"
-				height="16"
-				style="filter: var(--icon-filter);"
-			/>
-			{t("sidebar.downloadVersions")}
-		</button>
-		<button type="button" class="footer-btn" onclick={onopenquickmenu}>
-			<img
-				src="/images/icons/settings.svg"
-				alt=""
-				width="16"
-				height="16"
-				style="filter: var(--icon-filter);"
-			/>
-			{t("sidebar.settings")}
-		</button>
-		<div
-			class="user-profile"
-			onclick={() => (showUserMenu = true)}
-			role="button"
-			tabindex="0"
-			onkeydown={(e) =>
-				(e.key === "Enter" || e.key === " ") && (showUserMenu = true)}
-			style="cursor: pointer;"
-		>
-			<img
-				src="https://minotar.net/avatar/{launcherStore.settings
-					.username}"
-				alt="Avatar"
-				class="user-avatar"
-			/>
-			<div class="user-info">
-				<div class="user-name-wrapper">
-					<span class="user-name"
-						>{launcherStore.settings.username}</span
+			<span class="sd-header-left">
+				{#if activeCount > 0}
+					<span class="sd-spinner"></span>
+					<span class="sd-label"
+						>{activeCount} {t("sidebar.downloading")}</span
 					>
-					<img
-						src="/images/icons/edit.svg"
-						alt={t("userMenu.edit")}
-						class="user-edit-icon"
+				{:else if doneCount > 0}
+					<svg
 						width="12"
 						height="12"
-					/>
-				</div>
-				<span
-					class="user-status"
-					class:premium={launcherStore.settings.user}
-				>
-					{launcherStore.settings.user
-						? t("userMenu.premium")
-						: t("userMenu.offline")}
-				</span>
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="var(--color-success)"
+						stroke-width="2.5"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						><polyline points="20 6 9 17 4 12" /></svg
+					>
+					<span class="sd-label"
+						>{doneCount} {t("sidebar.completed")}</span
+					>
+				{:else}
+					<svg
+						width="18"
+						height="18"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					>
+						<path
+							d="M12 15V3m0 12l-4-4m4 4l4-4M2 17l.621 2.485A2 2 0 0 0 4.561 21h14.878a2 2 0 0 0 1.94-1.515L22 17"
+						/>
+					</svg>
+					<span class="sd-label">{t("sidebar.noDownloads")}</span>
+				{/if}
+			</span>
+			<svg
+				class="sd-chevron"
+				class:open={downloadsOpen}
+				width="16"
+				height="16"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+			>
+				<path d="M6 9l6 6 6-6" />
+			</svg>
+		</button>
+		{#if downloadsOpen}
+			<div class="sd-body" transition:slide={{ duration: 150 }}>
+				{#if downloads.size === 0}
+					<div class="sd-empty">
+						{t("sidebar.noDownloadDesc")}
+					</div>
+				{:else}
+					{#each [...downloads.values()] as item (item.version)}
+						{@const overall = pct(item.segs)}
+						<div class="sd-item" class:done={item.done}>
+							<div class="sd-item-header">
+								<span class="sd-item-left">
+									{#if item.done}
+										<svg
+											width="8"
+											height="8"
+											viewBox="0 0 24 24"
+											fill="none"
+											stroke="var(--color-success)"
+											stroke-width="3"
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											><polyline points="20 6 9 17 4 12" /></svg
+										>
+									{:else}
+										<span class="sd-spinner-sm"></span>
+									{/if}
+									<span class="sd-version"
+										>{item.version}</span
+									>
+								</span>
+								<span class="sd-pct" class:done={item.done}
+									>{overall}%</span
+								>
+							</div>
+							<div class="sd-progress-track">
+								<div
+									class="sd-progress-fill"
+									class:done={item.done}
+									style:width="{overall}%"
+								></div>
+							</div>
+						</div>
+					{/each}
+				{/if}
 			</div>
+		{/if}
+	</div>
+
+	<div class="section-full">
+	<CollapsibleSection
+		title={t("sidebar.tools")}
+		iconSrc="/images/icons/sliders.svg"
+		storageKey="sidebar-tools"
+	>
+		<div class="tools-group">
+			<button
+				type="button"
+				class="tools-btn"
+				onclick={onopencreateinstance}
+			>
+				<img
+					src="/images/icons/create.svg"
+					alt=""
+					width="14"
+					height="14"
+				/>
+				{t("sidebar.createInstance")}
+			</button>
+			<button
+				type="button"
+				class="tools-btn"
+				onclick={onopenversiondownloader}
+			>
+				<img
+					src="/images/icons/download.svg"
+					alt=""
+					width="14"
+					height="14"
+				/>
+				{t("sidebar.downloadVersions")}
+			</button>
+			<button type="button" class="tools-btn" onclick={onopenquickmenu}>
+				<img
+					src="/images/icons/settings.svg"
+					alt=""
+					width="14"
+					height="14"
+				/>
+				{t("sidebar.settings")}
+			</button>
 		</div>
+	</CollapsibleSection>
+	</div>
+
+	<div
+		class="user-profile"
+		onclick={() => (showUserMenu = true)}
+		role="button"
+		tabindex="0"
+		onkeydown={(e) =>
+			(e.key === "Enter" || e.key === " ") && (showUserMenu = true)}
+		style="cursor: pointer;"
+	>
+		<img
+			src="https://minotar.net/avatar/{launcherStore.settings
+				.username}"
+			alt="Avatar"
+			class="user-avatar"
+		/>
+		<div class="user-info">
+			<div class="user-name-wrapper">
+				<span class="user-name"
+					>{launcherStore.settings.username}</span
+				>
+				<img
+					src="/images/icons/edit.svg"
+					alt={t("userMenu.edit")}
+					class="user-edit-icon"
+					width="12"
+					height="12"
+				/>
+			</div>
+			<span
+				class="user-status"
+				class:premium={launcherStore.settings.user}
+			>
+				{launcherStore.settings.user
+					? t("userMenu.premium")
+					: t("userMenu.offline")}
+			</span>
+		</div>
+	</div>
 	</div>
 </aside>
 
@@ -340,7 +593,7 @@
 		border-right: 1px solid var(--border);
 		display: flex;
 		flex-direction: column;
-		padding: 18px 16px;
+		padding: 18px 16px 12px;
 		z-index: 10;
 		user-select: none;
 	}
@@ -449,45 +702,253 @@
 		opacity: 1;
 	}
 
-	.sidebar-footer {
-		margin-top: auto;
-		padding-top: 12px;
-		border-top: 1px solid var(--border);
+	/* ── Section group (like Settings.svelte) ────────────────────────── */
+
+	.sidebar-sections {
+		margin-top: 6px;
+		margin-bottom: -12px;
+		border: 1px solid var(--border-color);
+		border-radius: var(--border-radius-sm);
+		overflow: hidden;
+		width: calc(100% + 32px);
+		margin-left: -16px;
+		margin-right: -16px;
+	}
+
+	.sidebar-sections .sd-root {
+		border: none;
+		margin: 0;
+		width: auto;
+		border-bottom: 1px solid var(--border-color);
+	}
+
+	.sidebar-sections .section-full {
+		margin: 0;
+		width: auto;
+	}
+
+	.sidebar-sections .section-full :global(.cs-root) {
+		background: transparent;
+		border: none;
+		border-bottom: 1px solid var(--border-color);
+	}
+
+	.sidebar-sections .user-profile {
+		border: none;
+		margin: 0;
+		width: auto;
+	}
+
+	/* ── Downloads section ──────────────────────────────────────────── */
+
+	.sd-header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		width: 100%;
+		background: none;
+		border: none;
+		color: inherit;
+		padding: 8px 10px;
+		cursor: pointer;
+		border-radius: var(--border-radius-sm);
+		transition: background 0.15s ease;
+		user-select: none;
+		font-family: "Cantarell", system-ui, sans-serif;
+	}
+
+	.sd-header:hover {
+		background: rgba(255, 255, 255, 0.03);
+	}
+
+	.sd-header.expanded {
+		border-bottom: 1px solid var(--border);
+		border-radius: var(--border-radius-sm) var(--border-radius-sm) 0 0;
+	}
+
+	.sd-header-left {
+		display: flex;
+		align-items: center;
+		gap: 7px;
+		min-width: 0;
+		flex: 1;
+	}
+
+	.sd-label {
+		font-size: 0.75rem;
+		font-weight: 700;
+		color: var(--text-primary);
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		white-space: nowrap;
+	}
+
+
+	.sd-spinner {
+		width: 10px;
+		height: 10px;
+		border: 1.5px solid var(--border);
+		border-top-color: var(--text-muted);
+		border-radius: 50%;
+		animation: sd-spin 0.7s linear infinite;
+		flex-shrink: 0;
+	}
+
+	.sd-spinner-sm {
+		width: 8px;
+		height: 8px;
+		border: 1.5px solid var(--border);
+		border-top-color: var(--text-muted);
+		border-radius: 50%;
+		animation: sd-spin 0.7s linear infinite;
+		flex-shrink: 0;
+		display: block;
+	}
+
+	@keyframes sd-spin {
+		to {
+			transform: rotate(360deg);
+		}
+	}
+
+	.sd-chevron {
+		color: var(--accent);
+		flex-shrink: 0;
+		transition: transform 0.2s;
+	}
+
+	.sd-chevron.open {
+		transform: rotate(180deg);
+	}
+
+	.sd-body {
+		overflow: hidden;
+	}
+
+	.sd-item {
+		padding: 8px 10px;
+		border-bottom: 1px solid var(--border);
 		display: flex;
 		flex-direction: column;
 		gap: 6px;
 	}
 
-	.footer-btn {
+	.sd-item:last-child {
+		border-bottom: none;
+	}
+
+	.sd-item-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+	}
+
+	.sd-item-left {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		min-width: 0;
+		flex: 1;
+	}
+
+	.sd-version {
+		font-size: 0.72rem;
+		font-weight: 700;
+		color: var(--text-primary);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	.sd-pct {
+		font-size: 0.65rem;
+		font-weight: 700;
+		color: var(--text-muted);
+		flex-shrink: 0;
+	}
+
+	.sd-pct.done {
+		color: var(--color-success);
+	}
+
+	.sd-progress-track {
+		width: 100%;
+		height: 3px;
+		background: var(--bg-input);
+		border-radius: 2px;
+		overflow: hidden;
+	}
+
+	.sd-progress-fill {
+		height: 100%;
+		background: var(--accent);
+		border-radius: 2px;
+		transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+	}
+
+	.sd-progress-fill.done {
+		background: var(--color-success);
+	}
+
+	.sd-empty {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		min-height: 130px;
+		padding: 16px 10px;
+		text-align: center;
+		font-size: 0.68rem;
+		color: var(--text-muted);
+		line-height: 1.4;
+	}
+
+	/* ── Tools group ─────────────────────────────────────────────────── */
+
+	:global(.tools-group) {
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+		width: 100%;
+	}
+
+	.tools-btn {
 		background: transparent;
 		border: 1px solid var(--border);
 		color: var(--text-secondary);
-		padding: 8px 12px;
+		padding: 7px 10px;
 		border-radius: var(--border-radius-sm);
-		font-size: 0.78rem;
+		font-size: 0.75rem;
 		font-weight: 500;
 		cursor: pointer;
 		display: flex;
 		align-items: center;
-		gap: 8px;
+		gap: 7px;
+		width: 100%;
 		transition:
 			background 0.15s ease,
 			color 0.15s ease;
 		font-family: "Cantarell", system-ui, sans-serif;
 	}
 
-	.footer-btn:hover {
+	.tools-btn:hover {
 		background: var(--bg-item-active);
 		color: var(--text-primary);
 	}
+
+	.tools-btn img {
+		filter: var(--icon-filter);
+		flex-shrink: 0;
+	}
+
+	/* ── User profile ────────────────────────────────────────────────── */
 
 	.user-profile {
 		display: flex;
 		align-items: center;
 		gap: 10px;
-		padding: 10px 0 0;
-		margin-top: 5px;
-		border-top: 1px solid var(--border);
+		padding: 10px;
+		margin-top: auto;
+		background: var(--bg-item-active);
 	}
 
 	.user-avatar {
@@ -554,7 +1015,10 @@
 
 		.sidebar-header h1,
 		.instance-name,
-		.footer-btn,
+		.tools-btn,
+		.sd-label,
+		.sd-version,
+		.sd-pct,
 		.user-info {
 			display: none;
 		}
@@ -562,6 +1026,40 @@
 		.instance-item {
 			justify-content: center;
 			padding: 12px 0;
+		}
+
+		.sd-header {
+			justify-content: center;
+			padding: 8px 4px;
+		}
+
+		.sd-header .sd-chevron {
+			display: none;
+		}
+
+		.sd-item {
+			padding: 6px 4px;
+			align-items: center;
+		}
+
+		.sd-item-header {
+			justify-content: center;
+		}
+
+		.sd-item .sd-spinner-sm {
+			width: 10px;
+			height: 10px;
+		}
+
+		.user-profile {
+			justify-content: center;
+		}
+
+		.sidebar-sections {
+			margin-left: -10px;
+			margin-right: -10px;
+			width: calc(100% + 20px);
+			margin-bottom: -15px;
 		}
 	}
 </style>

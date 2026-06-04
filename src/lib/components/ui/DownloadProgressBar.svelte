@@ -294,7 +294,7 @@
 <style>
 	.dl-tray {
 		position: fixed;
-		bottom: 0;
+		top: 0;
 		right: 0;
 		z-index: 50;
 		display: flex;
@@ -306,10 +306,10 @@
 		display: flex;
 		align-items: center;
 		gap: 10px;
-		padding: 9px 18px 9px 28px;
+		padding: 9px 28px 9px 18px;
 		background: var(--bg-card);
 		border: none;
-		border-top: 1px solid var(--border-color);
+		border-bottom: 1px solid var(--border-color);
 		border-left: 1px solid var(--border-color);
 		color: var(--text-muted);
 		cursor: pointer;
@@ -318,7 +318,7 @@
 		font-weight: 600;
 		user-select: none;
 		letter-spacing: 0.3px;
-		clip-path: polygon(22px 0%, 100% 0%, 100% 100%, 0% 100%);
+		clip-path: polygon(0% 0%, 100% 0%, 100% 100%, 22px 100%);
 		transition:
 			background 0.15s ease,
 			color 0.15s ease;
@@ -378,7 +378,7 @@
 		max-height: 0;
 		overflow: hidden;
 		background: var(--bg-main);
-		border-top: 1px solid var(--border-color);
+		border-bottom: 1px solid var(--border-color);
 		border-left: 1px solid var(--border-color);
 		transition:
 			max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1),
