@@ -306,11 +306,25 @@
 				projectId,
 				instance.loader,
 			);
-			selectedModVersions = versions;
-			if (versions.length > 0) {
+			selectedModVersions = [...versions].sort((a, b) => {
+				const aCompat = isVersionCompatible(a) ? 1 : 0;
+				const bCompat = isVersionCompatible(b) ? 1 : 0;
+				return bCompat - aCompat;
+			});
+			if (selectedModVersions.length > 0) {
 				const stored = versionSelection.get(projectId);
-				if (stored && versions.find((v) => v.id === stored)) {
+				if (stored && selectedModVersions.find((v) => v.id === stored)) {
 					selectedVersionId = stored;
+				} else {
+					const compatible = selectedModVersions.find((v) =>
+						isVersionCompatible(v),
+					);
+					if (compatible) {
+						selectedVersionId = compatible.id;
+						let newVersionSelection = new SvelteMap(versionSelection);
+						newVersionSelection.set(projectId, compatible.id);
+						versionSelection = newVersionSelection;
+					}
 				}
 			}
 		} finally {
