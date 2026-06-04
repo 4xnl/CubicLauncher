@@ -241,29 +241,9 @@ pub async fn refresh_versions() -> Result<Vec<MinecraftVersion>, String> {
     download_manifest().await
 }
 
-#[derive(serde::Serialize)]
-pub struct DownloadQueueItem {
-    pub version: String,
-    pub status: String,
-    pub current: u64,
-    pub total: u64,
-}
-
 #[tauri::command]
-pub async fn get_download_queue() -> Vec<DownloadQueueItem> {
-    let queue = crate::services::DownloadQueue::get();
-    let handles = queue.get_active_downloads().await;
-
-    handles
-        .iter()
-        .map(|h| {
-            let (current, total) = h.get_progress();
-            DownloadQueueItem {
-                version: h.version.clone(),
-                status: format!("{:?}", h.get_status()).to_lowercase(),
-                current,
-                total,
-            }
-        })
-        .collect()
+pub async fn get_download_queue() -> Vec<crate::services::DownloadState> {
+    crate::services::DownloadQueue::get()
+        .get_active_downloads()
+        .await
 }

@@ -32,6 +32,7 @@ pub async fn install_jre(version: u8) -> Result<(), String> {
     emit(AppEvent::DFinishRuntime {
         version: version.to_string(),
     });
+    emit(AppEvent::JREChanged);
     Ok(())
 }
 
@@ -40,7 +41,9 @@ pub async fn uninstall_jre(version: u8) -> Result<(), String> {
     info!("Uninstalling JRE {}", version);
     JavaManager::uninstall(version)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+    emit(AppEvent::JREChanged);
+    Ok(())
 }
 
 #[command]

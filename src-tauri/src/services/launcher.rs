@@ -1,17 +1,16 @@
 use crate::core::path_manager::PathManager;
 use crate::core::{AppError, AppEvent, AuthError, DownloadError, FsError, InstanceError, emit};
-use crate::services::java_manager::JavaManager;
 use crate::services::SettingsManager;
 use crate::services::discord_presence;
 use crate::services::instance_manager::{
     InstanceHandle, InstanceStatus, register_kill_sender, unregister_kill_sender,
 };
+use crate::services::java_manager::JavaManager;
 use aqua::{DownloadManager, DownloadProgress};
 use dashmap::DashMap;
 use launchwerk::models::VersionManifest;
 use launchwerk::{LaunchConfig, Launchwerk};
 use launchwerk::{auth::AccountType, auth::microsoft::MicrosoftAuth};
-use std::sync::atomic::{AtomicU8, AtomicU64, Ordering};
 use std::sync::{Arc, OnceLock};
 use tauri::Emitter;
 use tokio::fs;
@@ -24,11 +23,6 @@ static DOWNLOAD_QUEUE: OnceLock<Arc<DownloadQueue>> = OnceLock::new();
 
 // ── DownloadStatus ────────────────────────────────────────────────────────────
 
-const DS_PENDING: u8 = 0;
-const DS_DOWNLOADING: u8 = 1;
-const DS_DONE: u8 = 2;
-const DS_ERROR: u8 = 3;
-
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum DownloadStatus {
@@ -38,123 +32,40 @@ pub enum DownloadStatus {
     Error(String),
 }
 
-struct AtomicDownloadStatus {
-    state: AtomicU8,
-    error: std::sync::Mutex<String>,
-}
+// ── DownloadState ────────────────────────────────────────────────────────────
+// Estado plano de una descarga. Sin atomics — todo se maneja desde el worker.
 
-impl AtomicDownloadStatus {
-    fn new() -> Self {
-        Self {
-            state: AtomicU8::new(DS_PENDING),
-            error: std::sync::Mutex::new(String::new()),
-        }
-    }
-
-    fn get(&self) -> DownloadStatus {
-        match self.state.load(Ordering::Acquire) {
-            DS_DOWNLOADING => DownloadStatus::Downloading,
-            DS_DONE => DownloadStatus::Done,
-            DS_ERROR => {
-                DownloadStatus::Error(self.error.lock().unwrap_or_else(|e| e.into_inner()).clone())
-            }
-            _ => DownloadStatus::Pending,
-        }
-    }
-
-    fn set(&self, status: DownloadStatus) {
-        match &status {
-            DownloadStatus::Pending => self.state.store(DS_PENDING, Ordering::Release),
-            DownloadStatus::Downloading => self.state.store(DS_DOWNLOADING, Ordering::Release),
-            DownloadStatus::Done => self.state.store(DS_DONE, Ordering::Release),
-            DownloadStatus::Error(e) => {
-                *self.error.lock().unwrap_or_else(|e| e.into_inner()) = e.clone();
-                self.state.store(DS_ERROR, Ordering::Release);
-            }
-        }
-    }
-}
-
-// ── DownloadProgress (atomic, sin lock) ──────────────────────────────────────
-
-struct AtomicProgress {
-    current: AtomicU64,
-    total: AtomicU64,
-}
-
-impl AtomicProgress {
-    fn new() -> Self {
-        Self {
-            current: AtomicU64::new(0),
-            total: AtomicU64::new(0),
-        }
-    }
-
-    fn update(&self, current: u64, total: u64) {
-        self.current.store(current, Ordering::Relaxed);
-        self.total.store(total, Ordering::Relaxed);
-    }
-
-    fn get(&self) -> (u64, u64) {
-        (
-            self.current.load(Ordering::Relaxed),
-            self.total.load(Ordering::Relaxed),
-        )
-    }
-}
-
-// ── DownloadHandle ────────────────────────────────────────────────────────────
-//
-// Clone es O(1) — solo incrementa reference counts.
-
-#[derive(Clone)]
-pub struct DownloadHandle {
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct DownloadState {
     pub version: String,
-    status: Arc<AtomicDownloadStatus>,
-    progress: Arc<AtomicProgress>,
+    pub status: DownloadStatus,
+    pub current: u64,
+    pub total: u64,
 }
 
-impl DownloadHandle {
+impl DownloadState {
     fn new(version: String) -> Self {
         Self {
             version,
-            status: Arc::new(AtomicDownloadStatus::new()),
-            progress: Arc::new(AtomicProgress::new()),
+            status: DownloadStatus::Pending,
+            current: 0,
+            total: 0,
         }
-    }
-
-    pub fn get_status(&self) -> DownloadStatus {
-        self.status.get()
-    }
-
-    pub fn get_progress(&self) -> (u64, u64) {
-        self.progress.get()
     }
 
     pub fn is_active(&self) -> bool {
         matches!(
-            self.get_status(),
+            self.status,
             DownloadStatus::Pending | DownloadStatus::Downloading
         )
-    }
-
-    fn set_status(&self, status: DownloadStatus) {
-        self.status.set(status);
-    }
-
-    fn update_progress(&self, current: u64, total: u64) {
-        self.progress.update(current, total);
     }
 }
 
 // ── DownloadQueue ─────────────────────────────────────────────────────────────
-//
-// El sender es la única forma de encolar versiones.
-// El worker task corre independiente — nunca bloquea al caller.
 
 pub struct DownloadQueue {
     sender: mpsc::Sender<String>,
-    active: DashMap<String, DownloadHandle>,
+    active: DashMap<String, DownloadState>,
 }
 
 impl DownloadQueue {
@@ -165,7 +76,6 @@ impl DownloadQueue {
     }
 
     pub async fn init(_app_handle: Option<tauri::AppHandle>) -> Arc<Self> {
-        // Canal ilimitado en la práctica — las descargas no son tan frecuentes
         let (tx, rx) = mpsc::channel::<String>(64);
 
         let queue = Arc::new(Self {
@@ -175,40 +85,35 @@ impl DownloadQueue {
 
         let queue_clone = queue.clone();
         tokio::spawn(async move {
-            if let Err(e) = Self::worker(rx, queue_clone).await {
-                error!("Worker de descargas terminó con error: {}", e);
-            }
+            Self::worker(rx, queue_clone).await;
         });
 
         let _ = DOWNLOAD_QUEUE.set(queue.clone());
         queue
     }
 
-    /// Encola una versión. O(1), sin await de lock.
-    /// Si ya está activa (pending o downloading), la ignora silenciosamente.
     pub async fn enqueue(&self, version: String) {
+        if let Some(state) = self.active.get(&version)
+            && state.is_active()
         {
-            if let Some(handle) = self.active.get(&version)
-                && handle.is_active()
-            {
-                warn!("La version {} ya está en cola o descargándose", version);
-                return;
-            }
+            return;
         }
 
-        info!("{} Ha sido encolada en la cola de descargas", &version);
+        info!("{} encolada", &version);
 
-        // Registrar el handle antes de enviar al worker
-        // para que get_active_downloads() refleje el estado inmediatamente
-        let handle = DownloadHandle::new(version.clone());
-        self.active.insert(version.clone(), handle);
+        self.active
+            .insert(version.clone(), DownloadState::new(version.clone()));
+
+        emit(AppEvent::DEnqueue {
+            version: version.clone(),
+        });
 
         if let Err(e) = self.sender.send(version).await {
             error!("Error al encolar descarga: {}", e);
         }
     }
 
-    pub async fn get_active_downloads(&self) -> Vec<DownloadHandle> {
+    pub async fn get_active_downloads(&self) -> Vec<DownloadState> {
         self.active
             .iter()
             .filter(|r| r.value().is_active())
@@ -217,62 +122,50 @@ impl DownloadQueue {
     }
 
     // ── Worker ────────────────────────────────────────────────────────────────
-    //
-    // Loop independiente — nadie lo lockea desde afuera.
-    // Lee del channel, descarga, actualiza el handle.
 
-    async fn worker(
-        mut rx: mpsc::Receiver<String>,
-        queue: Arc<DownloadQueue>,
-    ) -> Result<(), AppError> {
+    async fn worker(mut rx: mpsc::Receiver<String>, queue: Arc<DownloadQueue>) {
         while let Some(version) = rx.recv().await {
-            let handle = {
-                match queue.active.get(&version) {
-                    Some(h) => h.clone(),
-                    None => {
-                        error!("Handle no encontrado para versión {}, saltando", version);
-                        continue;
-                    }
-                }
-            };
-
-            handle.set_status(DownloadStatus::Downloading);
-
             let shared_dir = PathManager::get().get_shared_dir().to_path_buf();
             let manager = DownloadManager::new(shared_dir);
 
+            if let Some(mut state) = queue.active.get_mut(&version) {
+                state.status = DownloadStatus::Downloading;
+            } else {
+                error!("State no encontrado para {}, saltando", version);
+                continue;
+            }
+
             let download_handle = match manager.prepare(&version).await {
                 Ok(h) => h,
-                Err(_) => {
-                    if version.starts_with("fabric-loader-") {
-                        let game_version = version.split('-').next_back().unwrap_or("");
-                        match manager.prepare(game_version).await {
-                            Ok(h) => h,
-                            Err(_) => {
-                                let msg = format!(
-                                    "No se pudo resolver la versión base {} para Fabric",
-                                    game_version
-                                );
-                                error!("{}", msg);
-                                handle.set_status(DownloadStatus::Error(msg));
-                                continue;
+                Err(_) if version.starts_with("fabric-loader-") => {
+                    let gv = version.split('-').next_back().unwrap_or("");
+                    match manager.prepare(gv).await {
+                        Ok(h) => h,
+                        Err(_) => {
+                            let msg = format!("No se pudo resolver base {} para Fabric", gv);
+                            error!("{}", msg);
+                            if let Some(mut state) = queue.active.get_mut(&version) {
+                                state.status = DownloadStatus::Error(msg);
                             }
+                            continue;
                         }
-                    } else {
-                        let msg = format!("La versión solicitada no existe: {}", version);
-                        error!("{}", msg);
-                        handle.set_status(DownloadStatus::Error(msg));
-                        continue;
                     }
+                }
+                Err(_) => {
+                    let msg = format!("La versión solicitada no existe: {}", version);
+                    error!("{}", msg);
+                    if let Some(mut state) = queue.active.get_mut(&version) {
+                        state.status = DownloadStatus::Error(msg);
+                    }
+                    continue;
                 }
             };
 
             let (tx, mut progress_rx) = mpsc::channel::<DownloadProgress>(100);
-            let handle_for_monitor = handle.clone();
-            let version_for_monitor = version.clone();
 
-            let monitor_task = tokio::spawn(async move {
-                let mut interval = tokio::time::interval(std::time::Duration::from_millis(150));
+            // Monitor inline con join! — sin spawn extra
+            let monitor = async {
+                let mut interval = tokio::time::interval(std::time::Duration::from_millis(75));
                 interval.tick().await;
                 let mut latest: Option<DownloadProgress> = None;
 
@@ -282,7 +175,7 @@ impl DownloadQueue {
                         _ = interval.tick() => {
                             if let Some(ref p) = latest {
                                 emit(AppEvent::DProgress {
-                                    version: version_for_monitor.to_string(),
+                                    version: version.clone(),
                                     current: p.current as u32,
                                     total: p.total as u32,
                                     d_type: format!("{:?}", p.download_type),
@@ -292,8 +185,10 @@ impl DownloadQueue {
                         maybe = progress_rx.recv() => {
                             match maybe {
                                 Some(progress) => {
-                                    handle_for_monitor
-                                        .update_progress(progress.current as u64, progress.total as u64);
+                                    if let Some(mut state) = queue.active.get_mut(&version) {
+                                        state.current = progress.current as u64;
+                                        state.total = progress.total as u64;
+                                    }
                                     latest = Some(progress);
                                 }
                                 None => break,
@@ -304,35 +199,37 @@ impl DownloadQueue {
 
                 if let Some(p) = latest {
                     emit(AppEvent::DProgress {
-                        version: version_for_monitor.to_string(),
+                        version: version.clone(),
                         current: p.current as u32,
                         total: p.total as u32,
                         d_type: format!("{:?}", p.download_type),
                     });
                 }
-            });
+            };
 
-            match download_handle.download_all(Some(tx)).await {
+            let (dl_result, ()) = tokio::join!(download_handle.download_all(Some(tx)), monitor);
+
+            match dl_result {
                 Ok(_) => {
                     info!("Versión {} descargada correctamente", version);
-                    handle.set_status(DownloadStatus::Done);
-
+                    if let Some(mut state) = queue.active.get_mut(&version) {
+                        state.status = DownloadStatus::Done;
+                    }
                     emit(AppEvent::DFinish { version });
                 }
                 Err(e) => {
                     let msg = format!("No se pudo descargar {}: {:?}", version, e);
                     error!("{}", msg);
-                    handle.set_status(DownloadStatus::Error(msg));
+                    if let Some(mut state) = queue.active.get_mut(&version) {
+                        state.status = DownloadStatus::Error(msg);
+                    }
                 }
             }
 
-            let _ = monitor_task.await;
-
-            queue.active.retain(|_, h| h.is_active());
+            queue.active.retain(|_, s| s.is_active());
         }
 
         error!("Worker de descargas terminó inesperadamente — el channel fue cerrado");
-        Ok(())
     }
 }
 
@@ -579,7 +476,10 @@ impl Launcher {
     }
 }
 
-fn resolve_java_path(settings: &SettingsManager, java_version: Option<&launchwerk::models::JavaVersion>) -> std::path::PathBuf {
+fn resolve_java_path(
+    settings: &SettingsManager,
+    java_version: Option<&launchwerk::models::JavaVersion>,
+) -> std::path::PathBuf {
     let version = match java_version {
         Some(ref v) => v.major_version,
         None => 25,
@@ -616,113 +516,24 @@ fn resolve_java_path(settings: &SettingsManager, java_version: Option<&launchwer
 mod tests {
     use super::*;
 
-    // ── AtomicDownloadStatus ──────────────────────────────────────────────
-
-    /// Un `AtomicDownloadStatus` recién creado debe estar en `Pending`.
     #[test]
-    fn test_download_status_pending() {
-        let s = AtomicDownloadStatus::new();
-        assert_eq!(s.get(), DownloadStatus::Pending);
+    fn test_download_state_pending() {
+        let s = DownloadState::new("1.21".into());
+        assert_eq!(s.status, DownloadStatus::Pending);
+        assert!(s.is_active());
     }
 
-    /// Después de `set(Downloading)`, `get()` debe devolver `Downloading`.
     #[test]
-    fn test_download_status_downloading() {
-        let s = AtomicDownloadStatus::new();
-        s.set(DownloadStatus::Downloading);
-        assert_eq!(s.get(), DownloadStatus::Downloading);
+    fn test_download_state_not_active_done() {
+        let mut s = DownloadState::new("1.21".into());
+        s.status = DownloadStatus::Done;
+        assert!(!s.is_active());
     }
 
-    /// Después de `set(Done)`, `get()` debe devolver `Done`.
     #[test]
-    fn test_download_status_done() {
-        let s = AtomicDownloadStatus::new();
-        s.set(DownloadStatus::Done);
-        assert_eq!(s.get(), DownloadStatus::Done);
-    }
-
-    /// Después de `set(Error("network failure"))`, `get()` debe devolver
-    /// el mismo mensaje de error, verificando que el Mutex interno
-    /// almacene correctamente el texto del error.
-    #[test]
-    fn test_download_status_error() {
-        let s = AtomicDownloadStatus::new();
-        s.set(DownloadStatus::Error("network failure".into()));
-        assert_eq!(s.get(), DownloadStatus::Error("network failure".into()));
-    }
-
-    /// Verifica que el estado pueda transicionar en ciclo completo
-    /// Pending → Downloading → Done → Pending sin estados inconsistentes.
-    #[test]
-    fn test_download_status_cycle() {
-        let s = AtomicDownloadStatus::new();
-        assert_eq!(s.get(), DownloadStatus::Pending);
-        s.set(DownloadStatus::Downloading);
-        assert_eq!(s.get(), DownloadStatus::Downloading);
-        s.set(DownloadStatus::Done);
-        assert_eq!(s.get(), DownloadStatus::Done);
-        s.set(DownloadStatus::Pending);
-        assert_eq!(s.get(), DownloadStatus::Pending);
-    }
-
-    // ── AtomicProgress ────────────────────────────────────────────────────
-
-    /// Un `AtomicProgress` recién creado debe tener current=0 y total=0.
-    #[test]
-    fn test_progress_default() {
-        let p = AtomicProgress::new();
-        assert_eq!(p.get(), (0, 0));
-    }
-
-    /// Después de `update(50, 100)`, `get()` debe devolver `(50, 100)`.
-    #[test]
-    fn test_progress_update() {
-        let p = AtomicProgress::new();
-        p.update(50, 100);
-        assert_eq!(p.get(), (50, 100));
-    }
-
-    /// Verifica que `update()` sobrescriba valores anteriores correctamente.
-    #[test]
-    fn test_progress_overwrite() {
-        let p = AtomicProgress::new();
-        p.update(10, 20);
-        p.update(100, 200);
-        assert_eq!(p.get(), (100, 200));
-    }
-
-    // ── DownloadHandle ────────────────────────────────────────────────────
-
-    /// Un `DownloadHandle` en estado `Pending` debe considerarse activo.
-    #[test]
-    fn test_download_handle_is_active_pending() {
-        let h = DownloadHandle::new("1.21".into());
-        assert!(h.is_active());
-    }
-
-    /// Un `DownloadHandle` en estado `Downloading` debe considerarse activo.
-    #[test]
-    fn test_download_handle_is_active_downloading() {
-        let h = DownloadHandle::new("1.21".into());
-        h.set_status(DownloadStatus::Downloading);
-        assert!(h.is_active());
-    }
-
-    /// Un `DownloadHandle` en estado `Done` NO debe considerarse activo.
-    /// La descarga terminó, el frontend ya no debe mostrarlo como pendiente.
-    #[test]
-    fn test_download_handle_not_active_done() {
-        let h = DownloadHandle::new("1.21".into());
-        h.set_status(DownloadStatus::Done);
-        assert!(!h.is_active());
-    }
-
-    /// Un `DownloadHandle` en estado `Error` NO debe considerarse activo.
-    /// La descarga falló, no debe reintentarse automáticamente desde acá.
-    #[test]
-    fn test_download_handle_not_active_error() {
-        let h = DownloadHandle::new("1.21".into());
-        h.set_status(DownloadStatus::Error("err".into()));
-        assert!(!h.is_active());
+    fn test_download_state_not_active_error() {
+        let mut s = DownloadState::new("1.21".into());
+        s.status = DownloadStatus::Error("err".into());
+        assert!(!s.is_active());
     }
 }

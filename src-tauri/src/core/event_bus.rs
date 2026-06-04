@@ -23,12 +23,16 @@ pub enum AppEvent {
         total: u32,
         d_type: String,
     },
+    DEnqueue {
+        version: String,
+    },
     DFinish {
         version: String,
     },
     DFinishRuntime {
         version: String,
     },
+    JREChanged,
     STChanged,
     ThemeChanged {
         id: String,
