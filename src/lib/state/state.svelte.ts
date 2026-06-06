@@ -30,8 +30,8 @@ export const launcherStore = $state<LauncherState>({
 	pendingUpdate: null,
 	updateDownloaded: false,
 	settings: {
-		username: "Steve",
-		user: null,
+		user: [],
+		active_user_idx: 0,
 		min_memory: 1,
 		max_memory: 2,
 		jre8_path: "",

@@ -23,8 +23,12 @@ pub async fn update_settings(mut new_settings: SettingsManager) -> Result<(), St
         return Err("min_memory no puede ser mayor que max_memory".to_string());
     }
     SettingsManager::write(|s| {
-        new_settings.user = s.user.clone();
-        new_settings.active_user_idx = s.active_user_idx;
+        for new_user in &mut new_settings.user {
+            if let Some(existing) = s.user.iter().find(|u| u.username == new_user.username) {
+                new_user.access_token = existing.access_token.clone();
+                new_user.refresh_token = existing.refresh_token.clone();
+            }
+        }
         *s = new_settings;
         s.dirty = true;
     })?;

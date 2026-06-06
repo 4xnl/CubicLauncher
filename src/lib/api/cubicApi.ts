@@ -270,6 +270,18 @@ export async function logout(): Promise<void> {
 	await invoke("logout");
 }
 
+export async function switchUser(idx: number): Promise<void> {
+	await invoke("switch_user", { idx });
+}
+
+export async function removeUser(username: string): Promise<void> {
+	await invoke("remove_user", { username });
+}
+
+export async function getUserList(): Promise<MinecraftUser[]> {
+	return await invoke<MinecraftUser[]>("get_user_list");
+}
+
 export async function initDiscordPresence(): Promise<void> {
 	try {
 		await invoke("init_discord_presence");

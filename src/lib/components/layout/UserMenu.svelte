@@ -1,275 +1,529 @@
 <script lang="ts">
-	import { launcherStore } from "$lib/state/state.svelte";
-	import { saveSettings } from "$lib/api/launcherService";
+	import { launcherStore, showError } from "$lib/state/state.svelte";
+	import { saveSettings, markLocalSettingsChange } from "$lib/api/launcherService";
 	import { t } from "$lib/i18n";
-	import { showError } from "$lib/state/state.svelte";
-	import { logout } from "$lib/api/cubicApi";
+	import { logout, switchUser, removeUser } from "$lib/api/cubicApi";
 	import AuthModal from "./AuthModal.svelte";
 	import ModalBase from "./ModalBase.svelte";
 
 	let { open = $bindable(false) } = $props<{ open: boolean }>();
 
-	let editing = $state(false);
-	let newUsername = $state(launcherStore.settings.username);
+	let editingIdx = $state<number | null>(null);
+	let editingName = $state("");
 	let showAuthModal = $state(false);
+	let addingOffline = $state(false);
+	let offlineName = $state("");
+	let removingUser = $state<string | null>(null);
 
-	async function handleSave() {
-		const usernameRegex = /^[a-zA-Z0-9_]{3,16}$/;
+	$effect(() => {
+		if (open) {
+			editingIdx = null;
+			removingUser = null;
+			addingOffline = false;
+			offlineName = "";
+		}
+	});
 
-		if (!usernameRegex.test(newUsername)) {
-			showError(
-				"Nombre Inválido",
-				"El nombre debe tener entre 3 y 16 caracteres y solo contener letras, números y guiones bajos (_).",
-			);
+	async function handleSaveName(idx: number) {
+		const regex = /^[a-zA-Z0-9_]{3,16}$/;
+		if (!regex.test(editingName)) {
+			showError("Nombre Inválido", "El nombre debe tener entre 3 y 16 caracteres y solo contener letras, números y guiones bajos (_).");
 			return;
 		}
-
-		launcherStore.settings.username = newUsername;
-		await saveSettings();
-		editing = false;
+		const user = launcherStore.settings.user[idx];
+		if (user) {
+			user.username = editingName;
+			await saveSettings();
+		}
+		editingIdx = null;
 	}
 
-	function handleKeydown(e: KeyboardEvent) {
-		if (e.key === "Enter") handleSave();
-		if (e.key === "Escape") {
-			editing = false;
-			newUsername = launcherStore.settings.username;
-		}
+	function handleNameKeydown(e: KeyboardEvent, idx: number) {
+		if (e.key === "Enter") handleSaveName(idx);
+		if (e.key === "Escape") { editingIdx = null; }
 	}
 
 	async function handleLogout() {
+		markLocalSettingsChange();
 		await logout();
-		launcherStore.settings.user = null;
-		launcherStore.settings.username = "steve";
-		newUsername = "steve";
+	}
+
+	async function handleSwitchUser(idx: number) {
+		if (idx === launcherStore.settings.active_user_idx) return;
+		launcherStore.settings.active_user_idx = idx;
+		removingUser = null;
+		editingIdx = null;
+		markLocalSettingsChange();
+		await switchUser(idx);
+	}
+
+	async function handleRemoveUser(username: string) {
+		const idx = launcherStore.settings.user.findIndex((u) => u.username === username);
+		if (idx === -1) return;
+		launcherStore.settings.user = [...launcherStore.settings.user.slice(0, idx), ...launcherStore.settings.user.slice(idx + 1)];
+		if (launcherStore.settings.user.length === 0) {
+			launcherStore.settings.user = [{ username: "Steve", uuid: "", access_token: "", refresh_token: null, user_type: "Cracked" }];
+			launcherStore.settings.active_user_idx = 0;
+		} else if (idx <= launcherStore.settings.active_user_idx) {
+			launcherStore.settings.active_user_idx = Math.max(0, launcherStore.settings.active_user_idx - 1);
+		}
+		removingUser = null;
+		markLocalSettingsChange();
+		await removeUser(username);
+	}
+
+	async function handleAddOffline() {
+		const name = offlineName.trim();
+		if (!name) return;
+		launcherStore.settings.user = [
+			...launcherStore.settings.user,
+			{ username: name, uuid: "", access_token: "", refresh_token: null, user_type: "Cracked" },
+		];
+		launcherStore.settings.active_user_idx = launcherStore.settings.user.length - 1;
+		addingOffline = false;
+		offlineName = "";
+		await saveSettings();
+	}
+
+	function avatarSrc(username: string, size = 32): string {
+		return `https://minotar.net/avatar/${username}/${size}`;
+	}
+
+	function handleAvatarLoad(e: Event) {
+		(e.target as HTMLImageElement).style.opacity = "1";
+	}
+
+	function handleAvatarError(e: Event) {
+		(e.target as HTMLImageElement).style.opacity = "0";
 	}
 </script>
 
 <ModalBase bind:open title={t("userMenu.title")}>
-	<div class="user-profile-center">
-		<div class="avatar-wrapper">
-			<img
-				src="https://minotar.net/avatar/{launcherStore.settings
-					.username}/64"
-				alt="Avatar"
-				class="large-avatar"
-			/>
-			{#if launcherStore.settings.user}
-				<div class="status-dot premium"></div>
-			{:else}
-				<div class="status-dot"></div>
+	<div class="um-cards">
+		<!-- Add account card -->
+		<div class="card add-card">
+			<div class="add-toggle">
+				<button
+					type="button"
+					class="add-toggle-btn"
+					class:active={addingOffline}
+					onclick={() => (addingOffline = true)}
+				>
+					{t("userMenu.addOffline")}
+				</button>
+				<button
+					type="button"
+					class="add-toggle-btn"
+					class:active={!addingOffline}
+					onclick={() => (showAuthModal = true)}
+				>
+					{t("userMenu.loginMicrosoft")}
+				</button>
+			</div>
+			{#if addingOffline}
+				<div class="add-form">
+					<input
+						type="text"
+						bind:value={offlineName}
+						placeholder={t("userMenu.usernamePlaceholder")}
+						maxlength="16"
+						class="env-input"
+						onkeydown={(e) => e.key === "Enter" && handleAddOffline()}
+					/>
+					<div class="add-form-actions">
+						<button type="button" class="btn-primary" onclick={handleAddOffline}>{t("userMenu.add")}</button>
+						<button type="button" class="btn-secondary" onclick={() => { addingOffline = false; offlineName = ""; }}>{t("userMenu.cancel")}</button>
+					</div>
+				</div>
 			{/if}
 		</div>
 
-		<div class="user-info">
-			<div class="input-group" style="width: 100%; margin-top: 10px;">
-				<label class="input-label" for="username-edit"
-					>{t("userMenu.usernameLabel")}</label
-				>
-				<div style="display: flex; gap: 8px; align-items: center;">
-					{#if editing}
-						<input
-							id="username-edit"
-							type="text"
-							bind:value={newUsername}
-							onkeydown={handleKeydown}
-							class="text-input"
-							style="flex: 1;"
-							placeholder={t("userMenu.usernamePlaceholder")}
-							maxlength="16"
-						/>
-					{:else}
-						<div class="username-display-wrapper">
-							<span class="username-text"
-								>{launcherStore.settings.username}</span
-							>
-							{#if launcherStore.settings.user}
-								<span class="premium-tag"
-									>{t("userMenu.premium")}</span
-								>
-							{:else}
-								<span class="offline-tag"
-									>{t("userMenu.offline")}</span
-								>
-							{/if}
+		<!-- Saved Accounts -->
+		{#if launcherStore.settings.user.length > 0}
+			<span class="section-label">{t("userMenu.savedAccounts")}</span>
+			<div class="user-list">
+				{#each launcherStore.settings.user as u, i (i)}
+					<div
+						class="card user-card"
+						class:active={i === launcherStore.settings.active_user_idx}
+						onclick={() => handleSwitchUser(i)}
+						role="button"
+						tabindex="0"
+						onkeydown={(e) => e.key === "Enter" && handleSwitchUser(i)}
+					>
+						<div class="user-card-row">
+							<div class="user-avatar-wrapper">
+								<img
+									src={avatarSrc(u.username)}
+									alt={u.username}
+									class="user-avatar"
+									loading="lazy"
+									onload={handleAvatarLoad}
+									onerror={handleAvatarError}
+								/>
+							</div>
+							<div class="user-info">
+								{#if u.user_type === "Cracked" && editingIdx === i}
+									<input
+										type="text"
+										bind:value={editingName}
+										onkeydown={(e) => handleNameKeydown(e, i)}
+										onblur={() => { if (editingIdx === i) handleSaveName(i); }}
+										maxlength="16"
+										class="user-name-input"
+										autofocus
+									/>
+								{:else}
+									<span
+										class="user-name"
+										class:clickable={u.user_type === "Cracked"}
+										onclick={(e) => {
+											if (u.user_type === "Cracked") {
+												e.stopPropagation();
+												editingIdx = i;
+												editingName = u.username;
+											}
+										}}
+										role={u.user_type === "Cracked" ? "button" : undefined}
+										tabindex={u.user_type === "Cracked" ? 0 : undefined}
+										onkeydown={(e) => {
+											if (u.user_type === "Cracked" && (e.key === "Enter" || e.key === " ")) {
+												e.stopPropagation();
+												editingIdx = i;
+												editingName = u.username;
+											}
+										}}
+									>{u.username}</span>
+								{/if}
+								<span class="user-type">{u.user_type === "Microsoft" ? t("userMenu.premium") : t("userMenu.offline")}</span>
+							</div>
+							<div class="user-badges">
+								{#if i === launcherStore.settings.active_user_idx}
+									<span class="active-badge">{t("userMenu.active")}</span>
+								{/if}
+							</div>
+							<div class="user-actions">
+								{#if i === launcherStore.settings.active_user_idx && u.user_type === "Microsoft"}
+									<button type="button" class="icon-btn" title={t("userMenu.logout")} onclick={(e) => { e.stopPropagation(); handleLogout(); }}>
+										<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+									</button>
+								{/if}
+								{#if removingUser === u.username}
+									<div class="confirm-group">
+										<button type="button" class="icon-btn confirm-yes" onclick={(e) => { e.stopPropagation(); handleRemoveUser(u.username); }}>
+											<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+										</button>
+										<button type="button" class="icon-btn confirm-no" onclick={(e) => { e.stopPropagation(); removingUser = null; }}>
+											<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+										</button>
+									</div>
+								{:else}
+									<button type="button" class="icon-btn remove" title={t("userMenu.removeUser")} onclick={(e) => { e.stopPropagation(); removingUser = u.username; }}>
+										<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+									</button>
+								{/if}
+							</div>
 						</div>
-					{/if}
-				</div>
+					</div>
+				{/each}
 			</div>
-		</div>
-	</div>
-
-	<div class="auth-actions">
-		{#if launcherStore.settings.user}
-			<button
-				type="button"
-				class="btn-danger logout-btn"
-				onclick={handleLogout}
-			>
-				{t("userMenu.logout")}
-			</button>
-		{:else}
-			<button
-				type="button"
-				class="btn-primary microsoft-btn"
-				onclick={() => (showAuthModal = true)}
-			>
-				{t("userMenu.loginMicrosoft")}
-			</button>
 		{/if}
 	</div>
-
-	{#snippet footer()}
-		{#if editing}
-			<button
-				type="button"
-				class="btn-secondary"
-				onclick={() => {
-					editing = false;
-					newUsername = launcherStore.settings.username;
-				}}>Cancelar</button
-			>
-			<button type="button" class="btn-primary" onclick={handleSave}
-				>{t("userMenu.save")}</button
-			>
-		{:else if !launcherStore.settings.user}
-			<button
-				type="button"
-				class="btn-secondary"
-				style="flex: 1;"
-				onclick={() => (editing = true)}
-				>{t("userMenu.changeNameBtn")}</button
-			>
-		{/if}
-	{/snippet}
 </ModalBase>
 
 <AuthModal bind:open={showAuthModal} />
 
 <style>
-	.user-profile-center {
+	.um-cards {
 		display: flex;
 		flex-direction: column;
-		align-items: center;
-		gap: 16px;
+		gap: 10px;
 	}
 
-	.avatar-wrapper {
-		position: relative;
-	}
+	/* ── Card base ─────────────────────────────────────── */
 
-	.large-avatar {
-		width: 72px;
-		height: 72px;
+	.card {
+		background: var(--bg-card);
+		border: 1px solid var(--border-color);
 		border-radius: var(--border-radius-sm);
-		background: rgba(255, 255, 255, 0.03);
-		border: 1px solid var(--border);
+		box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255, 255, 255, 0.03);
+		overflow: hidden;
 	}
 
-	.status-dot {
-		position: absolute;
-		bottom: -4px;
-		right: -4px;
-		width: 14px;
-		height: 14px;
-		background: #4caf50;
-		border: 2px solid var(--bg-sidebar);
-		border-radius: 50%;
-		box-shadow: 0 0 10px rgba(76, 175, 80, 0.4);
-	}
+	/* ── Add account card (toggle + form) ──────────────── */
 
-	.username-display-wrapper {
+	.add-card {
 		display: flex;
 		flex-direction: column;
-		align-items: center;
-		width: 100%;
-		padding: 12px;
-		background: rgba(255, 255, 255, 0.02);
-		border: 1px solid var(--border);
-		border-radius: var(--border-radius-sm);
-		gap: 4px;
 	}
 
-	.username-text {
-		font-size: 1.1rem;
-		font-weight: 700;
+	.add-toggle {
+		display: flex;
+		gap: 0;
+	}
+
+	.add-toggle-btn {
+		flex: 1;
+		padding: 10px;
+		font-size: 0.78rem;
+		font-weight: 600;
+		cursor: pointer;
+		text-align: center;
+		font-family: inherit;
+		background: var(--bg-input);
+		border: none;
+		color: var(--text-secondary);
+		transition: all 0.15s;
+	}
+	.add-toggle-btn:first-child {
+		border-right: 1px solid var(--border-color);
+	}
+	.add-toggle-btn.active {
+		background: var(--accent);
+		color: var(--accent-text);
+	}
+	.add-toggle-btn:hover:not(.active) {
+		background: rgba(255, 255, 255, 0.04);
 		color: var(--text-primary);
 	}
 
-	.offline-tag {
-		font-size: 0.65rem;
-		text-transform: uppercase;
-		letter-spacing: 1px;
-		color: var(--text-secondary);
-		font-weight: 600;
+	.add-form {
+		display: flex;
+		gap: 8px;
+		padding: 12px 14px;
+		border-top: 1px solid var(--border-color);
+		align-items: center;
 	}
 
-	.premium-tag {
-		background: var(--bg-item-active);
-		border: 1px solid var(--border);
-		color: var(--accent);
-		padding: 2px 8px;
+	.add-form-actions {
+		display: flex;
+		gap: 6px;
+		flex-shrink: 0;
+	}
+
+	/* ── Env-style input ───────────────────────────────── */
+
+	.env-input {
+		flex: 1;
+		min-width: 0;
+		width: 0;
+		background: var(--bg-input);
+		border: 1px solid var(--border-color);
+		color: var(--text-primary);
+		padding: 4px 8px;
 		border-radius: var(--border-radius-sm);
-		font-size: 0.65rem;
+		font-size: 0.8rem;
+		height: 28px;
+		box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.2);
+		box-sizing: border-box;
+	}
+	.env-input:focus {
+		outline: none;
+		border-color: var(--text-muted);
+	}
+
+	/* ── Section label ─────────────────────────────────── */
+
+	.section-label {
+		font-size: 0.7rem;
 		font-weight: 700;
 		text-transform: uppercase;
 		letter-spacing: 0.5px;
-	}
-
-	.auth-actions {
-		margin-top: 10px;
-		width: 100%;
-	}
-
-	.microsoft-btn {
-		width: 100%;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		gap: 10px;
-		background: var(--accent) !important;
-		color: var(--bg-main) !important;
-		border: none !important;
-		font-weight: 700;
-		padding: 10px;
-		border-radius: var(--border-radius-sm);
-		cursor: pointer;
-		transition: all 0.2s ease;
-	}
-
-	.microsoft-btn:hover {
-		opacity: 0.9;
-		box-shadow: 0 4px 12px rgba(255, 255, 255, 0.1);
-	}
-
-	.logout-btn {
-		width: 100%;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		gap: 10px;
-	}
-
-	.btn-danger {
-		background: transparent;
-		border: 1px solid var(--border);
 		color: var(--text-secondary);
-		padding: 8px 16px;
-		border-radius: var(--border-radius-sm);
-		font-size: 0.8rem;
-		font-weight: 600;
+		margin-top: 4px;
+	}
+
+	/* ── User list ─────────────────────────────────────── */
+
+	.user-list {
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+	}
+
+	.user-card {
 		cursor: pointer;
-		transition: all 0.2s ease;
+		transition: border-color 0.15s;
+	}
+	.user-card:hover {
+		border-color: rgba(255, 255, 255, 0.1);
+	}
+	.user-card.active {
+		border-color: var(--accent);
+	}
+
+	.user-card-row {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		padding: 10px 12px;
+	}
+
+	/* ── Avatar ────────────────────────────────────────── */
+
+	.user-avatar-wrapper {
+		width: 32px;
+		height: 32px;
+		border-radius: var(--border-radius-sm);
+		border: 1px solid var(--border-color);
+		flex-shrink: 0;
+		background: url("/images/cubic.svg") center/60% no-repeat;
+		overflow: hidden;
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		gap: 10px;
-		width: 100%;
 	}
 
-	.btn-danger:hover {
-		background: rgba(255, 68, 68, 0.1);
-		border-color: rgba(255, 68, 68, 0.2);
-		color: #ff4444;
+	.user-avatar {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		opacity: 0;
+		transition: opacity 0.3s;
+		position: relative;
+		z-index: 1;
+		border-radius: inherit;
 	}
+
+	/* ── User info ─────────────────────────────────────── */
+
+	.user-info {
+		display: flex;
+		flex-direction: column;
+		min-width: 0;
+		flex: 1;
+	}
+
+	.user-name {
+		font-size: 0.85rem;
+		font-weight: 600;
+		color: var(--text-primary);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+	.user-name.clickable {
+		cursor: text;
+		border-bottom: 1px dashed rgba(255, 255, 255, 0.1);
+	}
+	.user-name.clickable:hover {
+		border-bottom-color: var(--accent);
+	}
+
+	.user-name-input {
+		font-size: 0.85rem;
+		font-weight: 600;
+		padding: 2px 4px;
+		background: rgba(255, 255, 255, 0.05);
+		border: 1px solid var(--accent);
+		border-radius: 3px;
+		color: var(--text-primary);
+		outline: none;
+		width: 100%;
+		box-sizing: border-box;
+	}
+
+	.user-type {
+		font-size: 0.6rem;
+		color: var(--text-secondary);
+		text-transform: uppercase;
+		letter-spacing: 0.3px;
+	}
+
+	/* ── Badges ────────────────────────────────────────── */
+
+	.user-badges {
+		display: flex;
+		gap: 4px;
+		flex-shrink: 0;
+	}
+
+	.active-badge {
+		font-size: 0.55rem;
+		background: var(--accent);
+		color: var(--bg-main);
+		padding: 2px 6px;
+		border-radius: 4px;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.3px;
+	}
+
+	/* ── Action icons ──────────────────────────────────── */
+
+	.user-actions {
+		display: flex;
+		gap: 2px;
+		flex-shrink: 0;
+	}
+
+	.icon-btn {
+		background: none;
+		border: 1px solid transparent;
+		color: var(--text-secondary);
+		cursor: pointer;
+		padding: 4px;
+		border-radius: 4px;
+		display: flex;
+		transition: all 0.15s;
+	}
+	.icon-btn:hover {
+		color: var(--text-primary);
+		border-color: var(--border-color);
+		background: rgba(255, 255, 255, 0.03);
+	}
+	.icon-btn.remove:hover {
+		color: var(--color-error);
+		border-color: rgba(var(--color-error-rgb), 0.2);
+		background: rgba(var(--color-error-rgb), 0.08);
+	}
+
+	.confirm-group {
+		display: flex;
+		gap: 2px;
+	}
+	.confirm-yes:hover {
+		color: var(--color-success);
+		border-color: rgba(var(--color-success-rgb), 0.2);
+		background: rgba(var(--color-success-rgb), 0.08);
+	}
+	.confirm-no:hover {
+		color: var(--color-error);
+		border-color: rgba(var(--color-error-rgb), 0.2);
+		background: rgba(var(--color-error-rgb), 0.08);
+	}
+
+	/* ── Shared button styles ──────────────────────────── */
+
+	.btn-primary {
+		background: var(--accent);
+		color: var(--accent-text);
+		border: none;
+		cursor: pointer;
+		padding: 5px 14px;
+		border-radius: var(--border-radius-sm);
+		font-size: 0.75rem;
+		font-weight: 600;
+		transition: opacity 0.15s;
+	}
+	.btn-primary:hover {
+		opacity: 0.85;
+	}
+
+	.btn-secondary {
+		background: transparent;
+		border: 1px solid var(--border-color);
+		color: var(--text-secondary);
+		cursor: pointer;
+		padding: 5px 14px;
+		border-radius: var(--border-radius-sm);
+		font-size: 0.75rem;
+		font-weight: 600;
+		transition: all 0.15s;
+	}
+	.btn-secondary:hover {
+		background: rgba(255, 255, 255, 0.03);
+		color: var(--text-primary);
+	}
+
 </style>

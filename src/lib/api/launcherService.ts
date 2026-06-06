@@ -1,6 +1,6 @@
 import { launcherStore, showError } from "../state/state.svelte";
 import { listen } from "@tauri-apps/api/event";
-import type { AppEvent, InstanceDto } from "../types/types";
+import type { AppEvent, InstanceDto, MinecraftUser } from "../types/types";
 import {
 	killInstance,
 	getSettings,
@@ -11,8 +11,23 @@ import { applyTheme } from "./themeManager";
 
 import { invoke } from "@tauri-apps/api/core";
 
+export function getActiveUser(): MinecraftUser | null {
+	const users = launcherStore.settings.user;
+	const idx = launcherStore.settings.active_user_idx;
+	if (users.length > 0 && idx >= 0 && idx < users.length) {
+		return users[idx];
+	}
+	return null;
+}
+
 let _listenerInitialized = false;
-let debounceTimer: ReturnType<typeof setTimeout>;
+let _instanceTimer: ReturnType<typeof setTimeout>;
+let _settingsTimer: ReturnType<typeof setTimeout>;
+let _localSettingsChange = false;
+
+export function markLocalSettingsChange(): void {
+	_localSettingsChange = true;
+}
 
 export function initEventListeners(): void {
 	if (_listenerInitialized) return;
@@ -29,8 +44,8 @@ export function initEventListeners(): void {
 				];
 				break;
 			case "InstanceEdited":
-				clearTimeout(debounceTimer);
-				debounceTimer = setTimeout(() => getVersions(), 100);
+				clearTimeout(_instanceTimer);
+				_instanceTimer = setTimeout(() => getVersions(), 100);
 				break;
 			case "InstanceDeleted":
 				launcherStore.loadedInstances =
@@ -41,10 +56,10 @@ export function initEventListeners(): void {
 			case "DFinishRuntime":
 				break;
 			case "STChanged":
-				syncSettings();
+				clearTimeout(_settingsTimer);
+				_settingsTimer = setTimeout(() => syncSettings(), 80);
 				break;
 			case "ThemeChanged":
-				console.log("ThemeChanged event:", payload.data.id);
 				if (payload.data.id === launcherStore.settings.theme) {
 					applyTheme(payload.data.id);
 				}
@@ -54,6 +69,10 @@ export function initEventListeners(): void {
 }
 
 export async function syncSettings(): Promise<void> {
+	if (_localSettingsChange) {
+		_localSettingsChange = false;
+		return;
+	}
 	const settings = await getSettings();
 	if (settings) {
 		launcherStore.settings = settings;
@@ -61,6 +80,7 @@ export async function syncSettings(): Promise<void> {
 }
 
 export async function saveSettings(): Promise<void> {
+	_localSettingsChange = true;
 	const prev = launcherStore.settings.discord_presence;
 	await updateSettings(launcherStore.settings);
 	if (launcherStore.settings.discord_presence && !prev) {

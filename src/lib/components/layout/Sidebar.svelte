@@ -5,7 +5,7 @@
 	import { listen } from "@tauri-apps/api/event";
 	import { getInstalledVersions, getDownloadQueue } from "$lib/api/cubicApi";
 	import { INSTANCE_LOGOS } from "$lib/icons/logos";
-	import { deleteInst, updateInst } from "$lib/api/launcherService";
+	import { deleteInst, updateInst, getActiveUser } from "$lib/api/launcherService";
 	import { launcherStore } from "$lib/state/state.svelte";
 	import type { InstanceDto, AppEvent } from "$lib/types/types";
 	import UserMenu from "./UserMenu.svelte";
@@ -37,6 +37,9 @@
 	let selectedIcon = $state<string | null>(null);
 	let installedVersions = $state<string[]>([]);
 	let availableIcons = $state<string[]>(INSTANCE_LOGOS);
+	let activeUser = $derived(getActiveUser());
+	let username = $derived(activeUser?.username ?? "Steve");
+	let isPremium = $derived(activeUser?.user_type === "Microsoft");
 	let versionOptions = $derived(
 		installedVersions.map((v) => ({ value: v, label: v })),
 	);
@@ -473,32 +476,22 @@
 				(e.key === "Enter" || e.key === " ") && (showUserMenu = true)}
 			style="cursor: pointer;"
 		>
-			<img
-				src="https://minotar.net/avatar/{launcherStore.settings
-					.username}"
-				alt="Avatar"
-				class="user-avatar"
-			/>
+			<div class="user-avatar-wrapper">
+				<img
+					src="https://minotar.net/avatar/{username}"
+					alt={username}
+					class="user-avatar"
+					loading="lazy"
+					onload={(e) => (e.target as HTMLImageElement).style.opacity = "1"}
+					onerror={(e) => (e.target as HTMLImageElement).style.opacity = "0"}
+				/>
+			</div>
 			<div class="user-info">
 				<div class="user-name-wrapper">
-					<span class="user-name"
-						>{launcherStore.settings.username}</span
-					>
-					<img
-						src="/images/icons/edit.svg"
-						alt={t("userMenu.edit")}
-						class="user-edit-icon"
-						width="12"
-						height="12"
-					/>
+					<span class="user-name">{username}</span>
 				</div>
-				<span
-					class="user-status"
-					class:premium={launcherStore.settings.user}
-				>
-					{launcherStore.settings.user
-						? t("userMenu.premium")
-						: t("userMenu.offline")}
+				<span class="user-status" class:premium={isPremium}>
+					{isPremium ? t("userMenu.premium") : t("userMenu.offline")}
 				</span>
 			</div>
 		</div>
@@ -946,6 +939,30 @@
 
 	/* ── User profile ────────────────────────────────────────────────── */
 
+	.user-avatar-wrapper {
+		width: 28px;
+		height: 28px;
+		border-radius: var(--border-radius-sm);
+		border: 1px solid var(--border);
+		flex-shrink: 0;
+		background: url("/images/cubic.svg") center/60% no-repeat;
+		overflow: hidden;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.user-avatar {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		opacity: 0;
+		transition: opacity 0.3s ease;
+		position: relative;
+		z-index: 1;
+		border-radius: inherit;
+	}
+
 	.user-profile {
 		display: flex;
 		align-items: center;
@@ -953,14 +970,6 @@
 		padding: 10px;
 		margin-top: auto;
 		background: var(--bg-item-active);
-	}
-
-	.user-avatar {
-		width: 28px;
-		height: 28px;
-		border-radius: var(--border-radius-sm);
-		background: rgba(255, 255, 255, 0.04);
-		border: 1px solid var(--border);
 	}
 
 	.user-info {
@@ -982,21 +991,6 @@
 		display: flex;
 		align-items: center;
 		gap: 6px;
-	}
-
-	.user-edit-icon {
-		opacity: 0;
-		filter: invert(1);
-		transition:
-			opacity 0.2s ease,
-			transform 0.2s ease;
-		transform: translateX(-4px);
-		pointer-events: none;
-	}
-
-	.user-profile:hover .user-edit-icon {
-		opacity: 0.5;
-		transform: translateX(0);
 	}
 
 	.user-status {

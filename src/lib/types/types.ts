@@ -33,8 +33,8 @@ export interface InstancesPollingPayload {
 }
 
 export interface Settings {
-	username: string;
-	user: MinecraftUser | null;
+	user: MinecraftUser[];
+	active_user_idx: number;
 	min_memory: number;
 	max_memory: number;
 	jre8_path: string;

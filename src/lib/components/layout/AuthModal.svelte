@@ -4,6 +4,7 @@
 		getDeviceCode,
 		authenticateWithDeviceCode,
 	} from "$lib/api/cubicApi";
+	import { saveSettings } from "$lib/api/launcherService";
 	import type { DeviceCode } from "$lib/types/types";
 	import { launcherStore } from "$lib/state/state.svelte";
 	import ModalBase from "./ModalBase.svelte";
@@ -31,8 +32,15 @@
 				deviceCode.expires_in,
 			);
 
-			launcherStore.settings.user = user;
-			launcherStore.settings.username = user.username;
+			const idx = launcherStore.settings.user.findIndex((u) => u.username === user.username);
+			if (idx >= 0) {
+				launcherStore.settings.user[idx] = user;
+				launcherStore.settings.active_user_idx = idx;
+			} else {
+				launcherStore.settings.user = [...launcherStore.settings.user, user];
+				launcherStore.settings.active_user_idx = launcherStore.settings.user.length - 1;
+			}
+			await saveSettings();
 			success = true;
 
 			setTimeout(() => {
@@ -224,7 +232,7 @@
 						<span class="field-label">Código</span>
 						<div class="copy-box code-box">
 							<div class="code-display">
-								{#each deviceCode.user_code.split("") as char (char)}
+								{#each deviceCode.user_code.split("") as char, i (i)}
 									<span
 										class="code-char {char === '-'
 											? 'dash'
