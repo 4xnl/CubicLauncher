@@ -164,6 +164,7 @@
 							</div>
 							<div class="user-info">
 								{#if u.user_type === "Cracked" && editingIdx === i}
+									<!-- svelte-ignore a11y_autofocus -->
 									<input
 										type="text"
 										bind:value={editingName}
@@ -174,6 +175,7 @@
 										autofocus
 									/>
 								{:else}
+									<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 									<span
 										class="user-name"
 										class:clickable={u.user_type === "Cracked"}
@@ -210,9 +212,11 @@
 								{/if}
 								{#if removingUser === u.username}
 									<div class="confirm-group">
+										<!-- svelte-ignore a11y_consider_explicit_label -->
 										<button type="button" class="icon-btn confirm-yes" onclick={(e) => { e.stopPropagation(); handleRemoveUser(u.username); }}>
 											<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
 										</button>
+										<!-- svelte-ignore a11y_consider_explicit_label -->
 										<button type="button" class="icon-btn confirm-no" onclick={(e) => { e.stopPropagation(); removingUser = null; }}>
 											<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
 										</button>

@@ -305,26 +305,26 @@
 		flex-direction: column;
 		align-items: center;
 		text-align: center;
-		padding: 1rem 0.5rem;
+		padding: 0;
 		width: 100%;
-		color: var(--text-primary, #fff);
+		color: var(--text-primary);
 		position: relative;
 	}
 
 	.ms-logo-wrapper {
-		margin-bottom: 2rem;
+		margin-bottom: 1.5rem;
 		padding: 1rem;
-		background: rgba(255, 255, 255, 0.03);
+		background: var(--bg-card);
 		border-radius: var(--border-radius-sm);
-		border: 1px solid rgba(255, 255, 255, 0.05);
-		box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+		border: 1px solid var(--border-color);
+		box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255, 255, 255, 0.03);
 		animation: slideDown 0.5s cubic-bezier(0.16, 1, 0.3, 1);
 	}
 
 	.ms-logo {
 		width: 48px;
 		height: 48px;
-		filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.3));
+		display: block;
 	}
 
 	.state-container {
@@ -336,17 +336,15 @@
 	}
 
 	.state-title {
-		font-size: 1.4rem;
+		font-size: 1.2rem;
 		font-weight: 700;
 		margin: 0 0 0.5rem 0;
-		background: linear-gradient(135deg, #fff, #aaa);
-		-webkit-background-clip: text;
-		-webkit-text-fill-color: transparent;
+		color: var(--text-primary);
 	}
 
 	.state-subtitle {
-		font-size: 0.95rem;
-		color: var(--text-secondary, #a0a0a0);
+		font-size: 0.85rem;
+		color: var(--text-secondary);
 		margin: 0;
 		max-width: 80%;
 		line-height: 1.5;
@@ -355,11 +353,17 @@
 	.minimal-spinner {
 		width: 32px;
 		height: 32px;
-		border: 2px solid rgba(255, 255, 255, 0.1);
-		border-top-color: var(--text-primary, #fff);
+		border: 2px solid var(--border);
+		border-top-color: var(--accent);
 		border-radius: 50%;
 		animation: spin 0.8s linear infinite;
 		margin-bottom: 1.5rem;
+	}
+
+	@keyframes spin {
+		to {
+			transform: rotate(360deg);
+		}
 	}
 
 	.icon-wrapper {
@@ -388,72 +392,51 @@
 	}
 
 	.icon-wrapper.success {
-		background: rgba(16, 185, 129, 0.1);
-		color: #10b981;
+		background: rgba(var(--color-success-rgb), 0.1);
+		color: var(--color-success);
 	}
 
 	.icon-wrapper.success::after {
 		background: radial-gradient(
 			circle,
-			rgba(16, 185, 129, 0.5) 0%,
+			rgba(var(--color-success-rgb), 0.5) 0%,
 			transparent 70%
 		);
 		animation: pop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 	}
 
 	.icon-wrapper.error {
-		background: rgba(239, 68, 68, 0.1);
-		color: #ef4444;
+		background: rgba(var(--color-error-rgb), 0.1);
+		color: var(--color-error);
 	}
 
 	.icon-wrapper.error::after {
 		background: radial-gradient(
 			circle,
-			rgba(239, 68, 68, 0.5) 0%,
+			rgba(var(--color-error-rgb), 0.5) 0%,
 			transparent 70%
 		);
 	}
 
 	.instruction-text {
-		font-size: 1rem;
-		color: var(--text-secondary, #e0e0e0);
-		margin-bottom: 2rem;
+		font-size: 0.85rem;
+		color: var(--text-secondary);
+		margin-bottom: 1.5rem;
 		line-height: 1.6;
-		padding: 0 1rem;
+		padding: 0 0.5rem;
 	}
 
 	.code-card {
-		background: rgba(0, 0, 0, 0.2);
-		border: 1px solid rgba(255, 255, 255, 0.08);
+		background: var(--bg-card);
+		border: 1px solid var(--border-color);
 		border-radius: var(--border-radius-sm);
-		padding: 1.5rem;
+		padding: 1.25rem;
 		width: 100%;
 		max-width: 340px;
 		display: flex;
 		flex-direction: column;
-		gap: 1.5rem;
-		box-shadow:
-			inset 0 2px 10px rgba(255, 255, 255, 0.02),
-			0 15px 35px rgba(0, 0, 0, 0.3);
-		position: relative;
-		overflow: hidden;
-	}
-
-	.code-card::before {
-		content: "";
-		position: absolute;
-		top: 0;
-		left: -100%;
-		width: 50%;
-		height: 100%;
-		background: linear-gradient(
-			90deg,
-			transparent,
-			rgba(255, 255, 255, 0.03),
-			transparent
-		);
-		transform: skewX(-20deg);
-		animation: shine 6s infinite;
+		gap: 1.25rem;
+		box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255, 255, 255, 0.03);
 	}
 
 	.field-group {
@@ -465,9 +448,9 @@
 	}
 
 	.field-label {
-		font-size: 0.8rem;
-		font-weight: 600;
-		color: var(--text-secondary, #a0a0a0);
+		font-size: 0.7rem;
+		font-weight: 700;
+		color: var(--text-secondary);
 		text-transform: uppercase;
 		letter-spacing: 0.5px;
 	}
@@ -477,8 +460,8 @@
 		align-items: center;
 		justify-content: space-between;
 		width: 100%;
-		background: rgba(255, 255, 255, 0.05);
-		border: 1px solid rgba(255, 255, 255, 0.1);
+		background: var(--bg-input);
+		border: 1px solid var(--border-color);
 		border-radius: var(--border-radius-sm);
 		padding: 0.5rem;
 		gap: 0.5rem;
@@ -489,8 +472,8 @@
 	}
 
 	.url-display {
-		font-size: 0.85rem;
-		color: var(--text-primary, #fff);
+		font-size: 0.8rem;
+		color: var(--text-primary);
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
@@ -504,82 +487,87 @@
 		align-items: center;
 		gap: 0.2rem;
 		font-family: "JetBrains Mono", "Courier New", monospace;
-		font-size: 1.2rem;
+		font-size: 1.1rem;
 		font-weight: 800;
 		letter-spacing: 1px;
 	}
 
 	.code-char {
-		background: rgba(255, 255, 255, 0.05);
-		padding: 0.2rem 0.3rem;
+		background: var(--bg-main);
+		padding: 0.15rem 0.25rem;
 		border-radius: var(--border-radius-sm);
-		color: #fff;
-		border: 1px solid rgba(255, 255, 255, 0.05);
+		color: var(--text-primary);
+		border: 1px solid var(--border);
 	}
 
 	.code-char.dash {
 		background: transparent;
 		border: none;
-		color: var(--text-secondary, #666);
+		color: var(--text-muted);
 	}
 
 	.icon-btn {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		background: rgba(255, 255, 255, 0.1);
-		color: #fff;
-		border: none;
-		padding: 0.5rem;
-		border-radius: var(--border-radius-sm);
+		background: none;
+		border: 1px solid transparent;
+		color: var(--text-secondary);
 		cursor: pointer;
-		transition: all 0.2s;
+		padding: 4px;
+		border-radius: 4px;
+		display: flex;
+		transition: all 0.15s;
 		flex-shrink: 0;
 	}
 
 	.icon-btn:hover {
-		background: rgba(255, 255, 255, 0.2);
+		color: var(--text-primary);
+		border-color: var(--border-color);
+		background: rgba(255, 255, 255, 0.03);
 	}
 
 	.icon-btn.copied {
-		background: #10b981;
-		color: #fff;
+		color: var(--color-success);
+		border-color: rgba(var(--color-success-rgb), 0.2);
+		background: rgba(var(--color-success-rgb), 0.08);
 	}
 
 	.action-btn.retry {
 		margin-top: 1.5rem;
-		background: rgba(255, 255, 255, 0.05);
-		color: #fff;
-		border: 1px solid rgba(255, 255, 255, 0.1);
-		padding: 0.75rem 2rem;
+		background: var(--bg-input);
+		color: var(--text-primary);
+		border: 1px solid var(--border-color);
+		padding: 0.65rem 2rem;
 		border-radius: var(--border-radius-sm);
 		font-weight: 600;
+		font-size: 0.8rem;
+		font-family: inherit;
 		cursor: pointer;
-		transition: all 0.2s;
+		transition: all 0.15s;
 	}
 
 	.action-btn.retry:hover {
-		background: rgba(255, 255, 255, 0.1);
-		border-color: rgba(255, 255, 255, 0.2);
+		background: rgba(255, 255, 255, 0.04);
+		color: var(--text-primary);
+		border-color: var(--text-muted);
 	}
 
 	.waiting-box {
-		margin-top: 2rem;
+		margin-top: 1.5rem;
 		display: flex;
 		align-items: center;
-		gap: 1rem;
-		padding: 1rem 1.5rem;
-		background: rgba(255, 255, 255, 0.02);
+		gap: 0.75rem;
+		padding: 0.75rem 1rem;
+		background: var(--bg-card);
+		border: 1px solid var(--border-color);
 		border-radius: var(--border-radius-sm);
-		border: 1px solid rgba(255, 255, 255, 0.05);
 		width: 100%;
 		max-width: 340px;
+		box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255, 255, 255, 0.03);
 	}
 
 	.minimal-dot {
 		width: 8px;
 		height: 8px;
-		background: var(--text-primary, #fff);
+		background: var(--accent);
 		border-radius: 50%;
 		flex-shrink: 0;
 		animation: simplePulse 1.5s ease-in-out infinite;
@@ -593,14 +581,14 @@
 	}
 
 	.status-title {
-		font-size: 0.9rem;
+		font-size: 0.85rem;
 		font-weight: 700;
-		color: #fff;
+		color: var(--text-primary);
 	}
 
 	.status-subtitle {
-		font-size: 0.75rem;
-		color: var(--text-secondary, #888);
+		font-size: 0.7rem;
+		color: var(--text-secondary);
 		margin-top: 0.1rem;
 	}
 
@@ -647,24 +635,9 @@
 		}
 	}
 
-	@keyframes shine {
-		0% {
-			left: -100%;
-		}
-		20% {
-			left: 200%;
-		}
-		100% {
-			left: 200%;
-		}
-	}
-
 	@media (max-height: 700px) {
-		.auth-container {
-			padding: 0;
-		}
 		.ms-logo-wrapper {
-			margin-bottom: 0.5rem;
+			margin-bottom: 0.75rem;
 			padding: 0.5rem;
 		}
 		.ms-logo {
@@ -677,18 +650,18 @@
 		}
 		.waiting-box {
 			margin-top: 1rem;
-			padding: 0.75rem 1rem;
+			padding: 0.5rem 0.75rem;
 		}
 		.field-group {
-			gap: 0.2rem;
+			gap: 0.25rem;
 		}
 		.state-title {
-			font-size: 1.2rem;
+			font-size: 1.1rem;
 			margin-bottom: 0.25rem;
 		}
 		.instruction-text {
-			margin-bottom: 1rem;
-			font-size: 0.9rem;
+			margin-bottom: 0.75rem;
+			font-size: 0.8rem;
 		}
 	}
 </style>
