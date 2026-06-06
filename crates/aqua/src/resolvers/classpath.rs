@@ -114,29 +114,33 @@ impl<'a> ClasspathResolver<'a> {
             if name.contains("net.minecraftforge:forge:")
                 || name.contains("net.minecraftforge:minecraftforge:")
             {
-                let parts: Vec<&str> = name.splitn(3, ':').collect();
+                let parts: Vec<&str> = name.splitn(4, ':').collect();
                 if parts.len() < 3 {
                     continue;
                 }
                 let group_path = parts[0].replace('.', "/");
                 let artifact = parts[1];
                 let version = parts[2];
+                let classifier = parts.get(3);
 
-                let universal = self
+                let base = self
                     .lib_dir
                     .join(&group_path)
                     .join(artifact)
-                    .join(version)
-                    .join(format!("{artifact}-{version}-universal.jar"));
+                    .join(&version);
+
+                if let Some(cls) = classifier {
+                    let jar = base.join(format!("{artifact}-{version}-{cls}.jar"));
+                    if jar.exists() {
+                        return Some(jar);
+                    }
+                }
+
+                let universal = base.join(format!("{artifact}-{version}-universal.jar"));
                 if universal.exists() {
                     return Some(universal);
                 }
-                let normal = self
-                    .lib_dir
-                    .join(group_path)
-                    .join(artifact)
-                    .join(version)
-                    .join(format!("{artifact}-{version}.jar"));
+                let normal = base.join(format!("{artifact}-{version}.jar"));
                 if normal.exists() {
                     return Some(normal);
                 }
@@ -147,8 +151,9 @@ impl<'a> ClasspathResolver<'a> {
 }
 
 fn maven_key(name: &str) -> String {
-    let parts: Vec<&str> = name.splitn(3, ':').collect();
+    let parts: Vec<&str> = name.splitn(4, ':').collect();
     match parts.as_slice() {
+        [group, artifact, _, classifier] => format!("{group}:{artifact}:{classifier}"),
         [group, artifact, ..] => format!("{group}:{artifact}"),
         _ => name.to_string(),
     }

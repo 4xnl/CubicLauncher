@@ -340,7 +340,29 @@ impl VersionManifest {
             id: self.id,
             id_raw: self.id_raw.clone(),
             main_class: self.main_class.clone().or(parent.main_class.clone()),
-            arguments: self.arguments.clone().or(parent.arguments.clone()),
+            arguments: {
+                let p_args = parent.arguments.as_ref();
+                let c_args = self.arguments.as_ref();
+                match (p_args, c_args) {
+                    (None, None) => None,
+                    (Some(p), None) => Some(p.clone()),
+                    (None, Some(c)) => Some(c.clone()),
+                    (Some(p), Some(c)) => {
+                        let mut jvm = p.jvm.clone().unwrap_or_default();
+                        if let Some(cj) = &c.jvm {
+                            jvm.extend(cj.clone());
+                        }
+                        let mut game = p.game.clone().unwrap_or_default();
+                        if let Some(cg) = &c.game {
+                            game.extend(cg.clone());
+                        }
+                        Some(VersionArgType {
+                            jvm: Some(jvm),
+                            game: Some(game),
+                        })
+                    }
+                }
+            },
             minecraft_arguments: self
                 .minecraft_arguments
                 .clone()
