@@ -58,44 +58,85 @@ pub async fn authenticate_with_device_code(
         .map_err(|e| format!("Failed to save tokens securely: {}", e))?;
 
     SettingsManager::write(|settings| {
-        settings.set_user(Some(user.clone()));
+        settings.add_user(user.clone());
+        settings.active_user_idx = settings.user.len() - 1;
     })?;
     SettingsManager::save().await?;
     Ok(user)
 }
 
 #[command]
-pub fn get_current_user() -> Result<Option<MinecraftUser>, String> {
+pub fn get_current_user() -> MinecraftUser {
     let settings = SettingsManager::read();
-    let has_user = settings.user.is_some();
-    if has_user {
-        info!("Devolviendo usuario autenticado");
-    } else {
-        info!("No hay usuario autenticado");
+    let mut s_user = settings.get_user();
+
+    if let Err(e) = s_user.load_tokens() {
+        warn!("Error cargando tokens: {:?}", e);
     }
-    Ok(settings.user.as_ref().map(|user| {
-        let mut u = user.clone();
-        if let Err(e) = u.load_tokens() {
-            warn!("Error cargando tokens: {:?}", e);
-        }
-        u
-    }))
+    s_user
 }
 
 #[command]
 pub async fn logout() -> Result<(), String> {
     info!("Cerrando sesión de usuario");
     SettingsManager::write(|settings| {
-        if let Some(user) = settings.user.as_ref() {
-            info!("Eliminando tokens para {}", user.username);
-            if let Err(e) = user.delete_tokens() {
-                warn!("Error eliminando tokens: {:?}", e);
-            }
+        let user = settings.get_user();
+        info!("Eliminando tokens para {}", user.username);
+        if let Err(_e) = user.delete_tokens() {
+            warn!("Error eliminando tokens.");
         }
-
-        settings.set_user(None);
+        settings.set_user(MinecraftUser::cracked(&user.username));
     })?;
     SettingsManager::save().await?;
     info!("Sesión cerrada exitosamente");
     Ok(())
+}
+
+#[command]
+pub async fn switch_user(idx: usize) -> Result<(), String> {
+    info!("Cambiando al usuario en índice {}", idx);
+    {
+        let settings = SettingsManager::read();
+        if idx >= settings.user.len() {
+            return Err(format!("Índice {} fuera de rango ({} usuarios)", idx, settings.user.len()));
+        }
+    }
+    SettingsManager::write(|settings| {
+        settings.active_user_idx = idx;
+        let mut user = settings.get_user();
+        if let Err(e) = user.load_tokens() {
+            warn!("Error cargando tokens: {:?}", e);
+        }
+    })?;
+    SettingsManager::save().await?;
+    Ok(())
+}
+
+#[command]
+pub async fn remove_user(username: String) -> Result<(), String> {
+    info!("Eliminando usuario {}", username);
+    {
+        let user = {
+            let settings = SettingsManager::read();
+            settings.user.iter().find(|u| u.username == username).cloned()
+        };
+        if let Some(u) = user {
+            info!("Eliminando tokens para {}", u.username);
+            if let Err(e) = u.delete_tokens() {
+                warn!("Error eliminando tokens: {:?}", e);
+            }
+        }
+    }
+    SettingsManager::write(|settings| {
+        settings.rem_user(&username);
+    })?;
+    SettingsManager::save().await?;
+    info!("Usuario {} eliminado exitosamente", username);
+    Ok(())
+}
+
+#[command]
+pub fn get_user_list() -> Vec<MinecraftUser> {
+    let settings = SettingsManager::read();
+    settings.user.clone()
 }

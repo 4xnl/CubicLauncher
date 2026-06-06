@@ -305,7 +305,7 @@ impl Launcher {
 
         let manifest = VersionManifest::from_file(version_json)
             .map_err(|e| DownloadError::ParseJson(e.to_string()))?;
-        let mut user = SettingsManager::read().get_minecraft_user();
+        let mut user = SettingsManager::read().get_user();
 
         let (java_version, java_path) =
             resolve_java_path(&settings_m, manifest.java_version.as_ref());
@@ -341,7 +341,7 @@ impl Launcher {
                         warn!("Error guardando tokens: {:?}", e);
                     }
                     SettingsManager::write(|settings| {
-                        settings.set_user(Some(user.clone()));
+                        settings.set_user(user.clone());
                     })?;
                     SettingsManager::save().await?;
                 }

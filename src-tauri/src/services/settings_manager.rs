@@ -15,9 +15,7 @@ static SETTINGS: LazyLock<RwLock<SettingsManager>> =
 
 // ── Defaults (serde) ──────────────────────────────────────────────────────────
 
-fn default_username() -> String {
-    String::from("steve")
-}
+
 fn default_min_mem() -> u32 {
     1
 }
@@ -33,17 +31,24 @@ fn default_true() -> bool {
 fn default_theme() -> String {
     String::from("dark")
 }
-
+fn default_active_user_idx() -> usize {
+    0
+}
+fn default_user() -> Vec<MinecraftUser> {
+    let mut vec = Vec::new();
+    vec.push(MinecraftUser::cracked("Steve"));
+    return vec;
+}
 // ── SettingsManager ───────────────────────────────────────────────────────────
 
 /// Configuración persistida del launcher.
 /// La memoria se almacena en GB.
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct SettingsManager {
-    #[serde(default = "default_username")]
-    pub username: String,
-    #[serde(default)]
-    pub user: Option<MinecraftUser>,
+    #[serde(default = "default_user")]
+    pub user: Vec<MinecraftUser>,
+    #[serde(default = "default_active_user_idx")]
+    pub active_user_idx: usize,
     #[serde(default = "default_min_mem")]
     pub min_memory: u32,
     #[serde(default = "default_max_mem")]
@@ -91,8 +96,12 @@ pub struct SettingsManager {
 impl Default for SettingsManager {
     fn default() -> Self {
         Self {
-            username: String::from("steve"),
-            user: None,
+            user: {
+                let mut vec = Vec::new();
+                vec.push(MinecraftUser::cracked("Steve"));
+                vec
+            },
+            active_user_idx: 0,
             min_memory: 1,
             max_memory: 2,
             jre8_path: PathBuf::new(),
@@ -153,29 +162,52 @@ impl SettingsManager {
     pub fn get_jre25_path(&self) -> &Path {
         &self.jre25_path
     }
-    pub fn get_minecraft_user(&self) -> MinecraftUser {
-        match &self.user {
-            Some(user) => {
-                let mut u = user.clone();
-                if let Err(e) = u.load_tokens() {
-                    warn!("Error cargando tokens: {:?}", e);
-                }
-                u
+    // pub fn get_minecraft_user(&self) -> MinecraftUser {
+    //     self.user.clone()
+    // }
+
+    // // ── Setters ───────────────────────────────────────────────────────────────
+
+    // pub fn set_user(&mut self, user: Option<MinecraftUser>) {
+    //     if let Some(ref u) = user {
+    //         self.username = u.username.clone();
+    //     }
+    //     self.user = user;
+    //     self.dirty = true;
+    // }
+
+    pub fn add_user(&mut self, user: MinecraftUser) {
+        self.user.push(user);
+    }
+
+    pub fn rem_user(&mut self, user_name: &str) {
+        let idx = self.user.iter().position(|u| u.username == user_name);
+        self.user.retain(|s| s.username != user_name);
+        if let Some(i) = idx {
+            if self.user.is_empty() {
+                self.user.push(MinecraftUser::cracked("Steve"));
+                self.active_user_idx = 0;
+            } else if i < self.active_user_idx || self.active_user_idx >= self.user.len() {
+                self.active_user_idx = self.active_user_idx.saturating_sub(1);
             }
-            None => MinecraftUser::cracked(&self.username),
         }
     }
 
-    // ── Setters ───────────────────────────────────────────────────────────────
-
-    pub fn set_user(&mut self, user: Option<MinecraftUser>) {
-        if let Some(ref u) = user {
-            self.username = u.username.clone();
+    pub fn get_user(&self) -> MinecraftUser {
+        if self.active_user_idx < self.user.len() {
+            return self.user[self.active_user_idx].clone();
         }
-        self.user = user;
-        self.dirty = true;
+        warn!("se intento obtener el usuario actual pero este no existe, devolviendo default.");
+        MinecraftUser::cracked("Steve")
     }
-
+    /// Reemplaza el usuario activo por otro
+    pub fn set_user(&mut self, user: MinecraftUser) {
+        if self.active_user_idx < self.user.len() {
+            self.user[self.active_user_idx] = user;
+        } else {
+            warn!("se intento reemplazar un usuario pero este no existe.");
+        }
+    }
     // ── Persistencia ──────────────────────────────────────────────────────────
 
     /// Serializa y escribe a disco.
@@ -283,11 +315,7 @@ impl SettingsManager {
 mod tests {
     use super::*;
 
-    /// La función `default_username()` debe devolver el string `"steve"`.
-    #[test]
-    fn test_default_username() {
-        assert_eq!(default_username(), "steve");
-    }
+
 
     /// `SettingsManager::default()` debe inicializar todos los campos con
     /// los valores por defecto definidos en las funciones `default_*`.
@@ -297,7 +325,8 @@ mod tests {
     #[test]
     fn test_default_values() {
         let s = SettingsManager::default();
-        assert_eq!(s.username, "steve");
+        assert_eq!(s.get_user().username, "Steve");
+        assert_eq!(s.active_user_idx, 0);
         assert_eq!(s.min_memory, 1);
         assert_eq!(s.max_memory, 2);
         assert_eq!(s.language, "es");
@@ -374,7 +403,7 @@ mod tests {
         let s = SettingsManager::default();
         let json = serde_json::to_string(&s).unwrap();
         let deserialized: SettingsManager = serde_json::from_str(&json).unwrap();
-        assert_eq!(deserialized.username, s.username);
+        assert_eq!(deserialized.active_user_idx, s.active_user_idx);
         assert_eq!(deserialized.min_memory, s.min_memory);
         assert_eq!(deserialized.max_memory, s.max_memory);
         assert_eq!(deserialized.language, s.language);

@@ -11,7 +11,7 @@ pub fn get_settings() -> Result<SettingsManager, String> {
 }
 
 #[command]
-pub async fn update_settings(new_settings: SettingsManager) -> Result<(), String> {
+pub async fn update_settings(mut new_settings: SettingsManager) -> Result<(), String> {
     info!("Actualizando configuración");
     if new_settings.min_memory == 0 {
         warn!("min_memory no puede ser 0, usando 1");
@@ -23,6 +23,8 @@ pub async fn update_settings(new_settings: SettingsManager) -> Result<(), String
         return Err("min_memory no puede ser mayor que max_memory".to_string());
     }
     SettingsManager::write(|s| {
+        new_settings.user = s.user.clone();
+        new_settings.active_user_idx = s.active_user_idx;
         *s = new_settings;
         s.dirty = true;
     })?;
