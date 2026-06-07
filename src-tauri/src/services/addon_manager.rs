@@ -4,8 +4,7 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::sync::LazyLock;
-use std::sync::Mutex;
+use std::sync::{Arc, LazyLock, Mutex};
 use std::time::SystemTime;
 use tracing::{debug, warn};
 use zip::ZipArchive;
@@ -23,7 +22,7 @@ pub struct AddonMetadata {
     pub version: Option<String>,
     pub description: Option<String>,
     pub authors: Option<Vec<String>>,
-    pub icon: Option<String>, // Base64
+    pub icon: Option<Arc<String>>, // Base64
 }
 
 type ParserFn = fn(&mut ZipArchive<File>) -> Result<AddonMetadata, ()>;
@@ -275,7 +274,7 @@ impl AddonManager {
         })
     }
 
-    fn extract_icon(archive: &mut ZipArchive<File>, path: &str) -> Option<String> {
+    fn extract_icon(archive: &mut ZipArchive<File>, path: &str) -> Option<Arc<String>> {
         let clean_path = path.trim_start_matches('/');
         let mut file = archive.by_name(clean_path).ok()?;
         let mut buffer = Vec::new();
@@ -291,10 +290,10 @@ impl AddonManager {
             "image/png"
         };
 
-        Some(format!(
+        Some(Arc::new(format!(
             "data:{};base64,{}",
             mime_type,
             general_purpose::STANDARD.encode(buffer)
-        ))
+        )))
     }
 }

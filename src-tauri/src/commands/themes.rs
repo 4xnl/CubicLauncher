@@ -1,3 +1,4 @@
+use crate::core::errors::{CoreError, FsError};
 use crate::core::{AppEvent, PathManager, emit};
 use crate::services::SettingsManager;
 use crate::theme_watcher::ThemeWatcher;
@@ -86,10 +87,10 @@ pub fn get_user_theme(id: String) -> Result<ThemeFile, String> {
         .join("theme.json");
 
     let content = std::fs::read_to_string(&theme_path)
-        .map_err(|e| format!("No se pudo leer el theme '{}': {}", id, e))?;
+        .map_err(|e| FsError::ReadFile { path: theme_path.to_string_lossy().to_string(), source: e }.to_string())?;
 
     let mut theme: ThemeFile =
-        serde_json::from_str(&content).map_err(|e| format!("Theme '{}' inválido: {}", id, e))?;
+        serde_json::from_str(&content).map_err(|e| CoreError::Other(format!("Theme '{}' inválido: {}", id, e)).to_string())?;
 
     // Resolver bg_image relativa al directorio del theme si no es absoluta
     if let Some(ref bg) = theme.bg_image
@@ -183,32 +184,32 @@ pub fn import_theme(source_path: String) -> Result<ThemeEntry, String> {
     let source = std::path::Path::new(&source_path);
     if !source.exists() {
         error!("Archivo de theme no existe: {}", source_path);
-        return Err("El archivo no existe".to_string());
+        return Err(FsError::NotFound(source_path.clone()).to_string());
     }
 
     let content =
-        std::fs::read_to_string(source).map_err(|e| format!("Error al leer el archivo: {}", e))?;
+        std::fs::read_to_string(source).map_err(|e| FsError::ReadFile { path: source_path.clone(), source: e }.to_string())?;
 
     let theme_file: ThemeFile = serde_json::from_str(&content)
-        .map_err(|e| format!("El archivo no es un theme válido: {}", e))?;
+        .map_err(|e| CoreError::Other(format!("El archivo no es un theme válido: {}", e)).to_string())?;
 
     let theme_id = theme_file.name.to_lowercase().replace(' ', "_");
     let theme_dir = PathManager::get().get_themes_dir().join(&theme_id);
 
     if theme_dir.exists() {
         error!("El theme '{}' ya existe", theme_file.name);
-        return Err(format!(
+        return Err(CoreError::Other(format!(
             "Ya existe un theme con el nombre '{}'",
             theme_file.name
-        ));
+        )).to_string());
     }
 
     std::fs::create_dir_all(&theme_dir)
-        .map_err(|e| format!("No se pudo crear el directorio del theme: {}", e))?;
+        .map_err(|e| FsError::CreateDir { path: theme_dir.to_string_lossy().to_string(), source: e }.to_string())?;
 
     let dest_path = theme_dir.join("theme.json");
     std::fs::write(&dest_path, &content)
-        .map_err(|e| format!("No se pudo copiar el theme: {}", e))?;
+        .map_err(|e| FsError::WriteFile { path: dest_path.to_string_lossy().to_string(), source: e }.to_string())?;
 
     // Si el bg_image es una ruta relativa, intentar copiar el archivo
     if let Some(ref bg) = theme_file.bg_image

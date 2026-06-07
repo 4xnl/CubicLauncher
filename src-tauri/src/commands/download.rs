@@ -1,3 +1,4 @@
+use crate::core::errors::{DownloadError, FsError};
 use crate::core::{HTTP, PathManager};
 use crate::services::DownloadQueue;
 use aqua::{DownloadManager, FabricBatch};
@@ -51,12 +52,12 @@ pub async fn download_manifest() -> Result<Vec<MinecraftVersion>, String> {
         .get(MOJANG_MANIFEST_URL)
         .send()
         .await
-        .map_err(|e| format!("Error al obtener el manifiesto: {e}"))?;
+        .map_err(|e| DownloadError::Request(e.to_string()).to_string())?;
 
     let bytes = response
         .bytes()
         .await
-        .map_err(|e| format!("Error al leer bytes del manifiesto: {e}"))?;
+        .map_err(|e| DownloadError::ReadResponse(e.to_string()).to_string())?;
 
     info!(
         "Manifiesto descargado ({} bytes), cacheando en disco",
@@ -64,10 +65,10 @@ pub async fn download_manifest() -> Result<Vec<MinecraftVersion>, String> {
     );
     fs::write(&path, &bytes)
         .await
-        .map_err(|e| format!("Error al escribir manifiesto al disco: {e}"))?;
+        .map_err(|e| FsError::WriteFile { path: path.to_string_lossy().to_string(), source: e }.to_string())?;
 
     let manifest: MinecraftManifest =
-        serde_json::from_slice(&bytes).map_err(|e| format!("Error parseando JSON: {e}"))?;
+        serde_json::from_slice(&bytes).map_err(|e| DownloadError::ParseJson(e.to_string()).to_string())?;
 
     info!(
         "Manifiesto parseado: {} versiones disponibles",
@@ -87,7 +88,7 @@ pub async fn get_available_versions() -> Result<Vec<MinecraftVersion>, String> {
         match tokio::fs::read(path).await {
             Ok(d) => {
                 let manifest: MinecraftManifest = serde_json::from_slice(&d)
-                    .map_err(|e| format!("Error parseando manifest: {}", e))?;
+                    .map_err(|e| DownloadError::ParseJson(e.to_string()).to_string())?;
                 info!("{} versiones cargadas desde caché", manifest.versions.len());
                 Ok(manifest.versions)
             }
@@ -141,12 +142,12 @@ pub async fn get_fabric_versions() -> Result<Vec<FabricGameVersion>, String> {
         .get(url)
         .send()
         .await
-        .map_err(|e| format!("Error al obtener versiones de Fabric: {}", e))?;
+        .map_err(|e| DownloadError::Request(e.to_string()).to_string())?;
 
     let versions = response
         .json::<Vec<FabricGameVersion>>()
         .await
-        .map_err(|e| format!("Error al parsear versiones de Fabric: {}", e))?;
+        .map_err(|e| DownloadError::ParseJson(e.to_string()).to_string())?;
 
     info!(
         "{} versiones de Fabric obtenidas, cacheando en disco",
@@ -183,7 +184,7 @@ pub async fn download_fabric(
     } else {
         FabricBatch::resolve_latest_loader(&game_version)
             .await
-            .map_err(|e| format!("Error al obtener loaders: {}", e))?
+            .map_err(|e| DownloadError::Request(e.to_string()).to_string())?
     };
 
     let fabric_version_id = format!("fabric-loader-{}-{}", loader_version, game_version);
@@ -206,18 +207,18 @@ pub async fn download_fabric(
 
     let batch = FabricBatch::new(shared_dir, &game_version, &loader_version)
         .await
-        .map_err(|e| format!("Error al crear perfil Fabric: {}", e))?;
+        .map_err(|e| DownloadError::Request(e.to_string()).to_string())?;
 
     let manager = DownloadManager::new(shared_dir.to_path_buf());
     let handle = manager
         .prepare_batch(Box::new(batch))
         .await
-        .map_err(|e| format!("Error al preparar descarga Fabric: {}", e))?;
+        .map_err(|e| DownloadError::Request(e.to_string()).to_string())?;
 
     handle
         .download_all(None)
         .await
-        .map_err(|e| format!("Error al descargar Fabric: {}", e))?;
+        .map_err(|e| DownloadError::Request(e.to_string()).to_string())?;
 
     info!("Fabric {} descargado correctamente", fabric_version_id);
     DownloadQueue::get().enqueue(fabric_version_id).await;
@@ -234,7 +235,7 @@ pub async fn refresh_versions() -> Result<Vec<MinecraftVersion>, String> {
     if path.exists() {
         tokio::fs::remove_file(&path)
             .await
-            .map_err(|e| format!("Error al eliminar la caché del manifiesto: {}", e))?;
+            .map_err(|e| FsError::Remove { path: path.to_string_lossy().to_string(), source: e }.to_string())?;
         info!("Caché de manifiesto eliminado: {:?}", path);
     }
 

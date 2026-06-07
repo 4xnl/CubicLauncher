@@ -1,4 +1,5 @@
-use std::sync::OnceLock;
+use std::borrow::Cow;
+use std::sync::{Arc, OnceLock};
 
 use serde::Serialize;
 use tauri::{AppHandle, Emitter};
@@ -18,16 +19,16 @@ pub enum AppEvent {
         dto: InstanceDto,
     },
     DProgress {
-        version: String,
+        version: Arc<String>,
         current: u32,
         total: u32,
-        d_type: String,
+        d_type: Cow<'static, str>,
     },
     DEnqueue {
-        version: String,
+        version: Arc<String>,
     },
     DFinish {
-        version: String,
+        version: Arc<String>,
     },
     DFinishRuntime {
         version: String,

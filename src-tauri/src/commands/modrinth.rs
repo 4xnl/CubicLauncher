@@ -2,6 +2,7 @@ use aqua::{DownloadItemSpec, DownloadManager, GenericBatch};
 use serde::{Deserialize, Serialize};
 use tracing::info;
 
+use crate::core::errors::{DownloadError, FsError, InstanceError};
 use crate::core::PathManager;
 use crate::services::InstanceManager;
 
@@ -17,12 +18,12 @@ pub async fn download_mods(instance_id: String, mods: Vec<ModDownloadInfo>) -> R
     let handle = manager
         .get_handle(&instance_id)
         .await
-        .ok_or("Instancia no encontrada")?;
+        .ok_or_else(|| InstanceError::NotFound.to_string())?;
     let mods_dir = handle.get_instance_dir().await.join("mods");
 
     tokio::fs::create_dir_all(&mods_dir)
         .await
-        .map_err(|e| format!("Error creando directorio mods: {}", e))?;
+        .map_err(|e| FsError::CreateDir { path: mods_dir.to_string_lossy().to_string(), source: e }.to_string())?;
 
     let count = mods.len();
     let items: Vec<DownloadItemSpec> = mods
@@ -44,12 +45,12 @@ pub async fn download_mods(instance_id: String, mods: Vec<ModDownloadInfo>) -> R
     let handle = dm
         .prepare_batch(Box::new(batch))
         .await
-        .map_err(|e| format!("Error al preparar descarga de mods: {}", e))?;
+        .map_err(|e| DownloadError::Request(e.to_string()).to_string())?;
 
     handle
         .download_all(None)
         .await
-        .map_err(|e| format!("Error al descargar mods: {}", e))?;
+        .map_err(|e| DownloadError::Request(e.to_string()).to_string())?;
 
     info!("{} mods descargados correctamente en {:?}", count, mods_dir);
     Ok(())

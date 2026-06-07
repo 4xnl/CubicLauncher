@@ -34,28 +34,8 @@ impl From<AppError> for String {
         e.to_string()
     }
 }
-impl From<InstanceError> for String {
-    fn from(e: InstanceError) -> String {
-        e.to_string()
-    }
-}
 impl From<CoreError> for String {
     fn from(e: CoreError) -> String {
-        e.to_string()
-    }
-}
-impl From<AuthError> for String {
-    fn from(e: AuthError) -> String {
-        e.to_string()
-    }
-}
-impl From<DownloadError> for String {
-    fn from(e: DownloadError) -> String {
-        e.to_string()
-    }
-}
-impl From<FsError> for String {
-    fn from(e: FsError) -> String {
         e.to_string()
     }
 }
@@ -100,22 +80,6 @@ mod tests {
         assert!(matches!(err, AppError::Download(_)));
     }
 
-    /// `InstanceError::NotFound` debe convertirse al string
-    /// `"Instancia no encontrada"` para mostrar al usuario.
-    #[test]
-    fn test_instance_error_into_string() {
-        let s: String = InstanceError::NotFound.into();
-        assert_eq!(s, "Instancia no encontrada");
-    }
-
-    /// `FsError::NotFound("/x")` debe convertirse al string
-    /// `"Archivo no encontrado: '/x'"` incluyendo el path.
-    #[test]
-    fn test_fs_error_into_string() {
-        let s: String = FsError::NotFound("/x".into()).into();
-        assert_eq!(s, "Archivo no encontrado: '/x'");
-    }
-
     /// `CoreError::LockPoisoned("oh no")` debe convertirse al string
     /// `"Lock envenenado: oh no"`.
     #[test]
@@ -124,19 +88,35 @@ mod tests {
         assert_eq!(s, "Lock envenenado: oh no");
     }
 
-    /// `AuthError::SaveTokensFailed("oops")` debe convertirse al string
+    /// `AppError::Instance(InstanceError::NotFound)` debe convertirse al string
+    /// `"Instancia no encontrada"` para mostrar al usuario.
+    #[test]
+    fn test_app_error_into_string() {
+        let s: String = AppError::Instance(InstanceError::NotFound).into();
+        assert_eq!(s, "Instancia no encontrada");
+    }
+
+    /// `AppError::Fs(FsError::NotFound("/x"))` debe convertirse al string
+    /// `"Archivo no encontrado: '/x'"` incluyendo el path.
+    #[test]
+    fn test_app_error_fs_into_string() {
+        let s: String = AppError::from(FsError::NotFound("/x".into())).into();
+        assert_eq!(s, "Archivo no encontrado: '/x'");
+    }
+
+    /// `AppError::Auth(AuthError::SaveTokensFailed("oops"))` debe convertirse al string
     /// `"Error al guardar los tokens: oops"`.
     #[test]
-    fn test_auth_error_into_string() {
-        let s: String = AuthError::SaveTokensFailed("oops".into()).into();
+    fn test_app_error_auth_into_string() {
+        let s: String = AppError::from(AuthError::SaveTokensFailed("oops".into())).into();
         assert_eq!(s, "Error al guardar los tokens: oops");
     }
 
-    /// `DownloadError::NoFabricLoader` debe convertirse al string
+    /// `AppError::Download(DownloadError::NoFabricLoader)` debe convertirse al string
     /// `"No se encontró ningún loader de Fabric para esta versión"`.
     #[test]
-    fn test_download_error_into_string() {
-        let s: String = DownloadError::NoFabricLoader.into();
+    fn test_app_error_download_into_string() {
+        let s: String = AppError::from(DownloadError::NoFabricLoader).into();
         assert_eq!(
             s,
             "No se encontró ningún loader de Fabric para esta versión"

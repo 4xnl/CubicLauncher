@@ -27,7 +27,7 @@ pub enum InstanceError {
     InvalidSourcePath,
 
     #[error("No hay ningun runtime de Java seteado, se necesita Java {0}.")]
-    JreDoesntExists(String),
+    JreNotFound(String),
 
     #[error(transparent)]
     Fs(#[from] crate::core::errors::fs::FsError),

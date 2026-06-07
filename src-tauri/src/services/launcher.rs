@@ -1,4 +1,3 @@
-use crate::core::InstanceError::JreDoesntExists;
 use crate::core::path_manager::PathManager;
 use crate::core::{AppError, AppEvent, AuthError, DownloadError, FsError, InstanceError, emit};
 use crate::services::SettingsManager;
@@ -7,15 +6,16 @@ use crate::services::instance_manager::{
     InstanceHandle, InstanceStatus, register_kill_sender, unregister_kill_sender,
 };
 use crate::services::java_manager::JavaManager;
-use aqua::{DownloadManager, DownloadProgress};
+use aqua::{DownloadManager, DownloadProgress, DownloadProgressType};
 use dashmap::DashMap;
 use launchwerk::models::VersionManifest;
 use launchwerk::{LaunchConfig, Launchwerk};
-use launchwerk::{auth::AccountType, auth::microsoft::MicrosoftAuth};
+use launchwerk::auth::{microsoft::MicrosoftAuth, AccountType, MinecraftUser};
+use std::borrow::Cow;
 use std::sync::{Arc, OnceLock};
 use tauri::Emitter;
 use tokio::fs;
-use tokio::sync::mpsc;
+use tokio::sync::{broadcast, mpsc};
 use tracing::{error, info, trace, warn};
 // ── Statics ───────────────────────────────────────────────────────────────────
 
@@ -38,14 +38,14 @@ pub enum DownloadStatus {
 
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct DownloadState {
-    pub version: String,
+    pub version: Arc<String>,
     pub status: DownloadStatus,
     pub current: u64,
     pub total: u64,
 }
 
 impl DownloadState {
-    fn new(version: String) -> Self {
+    fn new(version: Arc<String>) -> Self {
         Self {
             version,
             status: DownloadStatus::Pending,
@@ -65,8 +65,8 @@ impl DownloadState {
 // ── DownloadQueue ─────────────────────────────────────────────────────────────
 
 pub struct DownloadQueue {
-    sender: mpsc::Sender<String>,
-    active: DashMap<String, DownloadState>,
+    sender: mpsc::Sender<Arc<String>>,
+    active: DashMap<Arc<String>, DownloadState>,
 }
 
 impl DownloadQueue {
@@ -77,7 +77,7 @@ impl DownloadQueue {
     }
 
     pub async fn init(_app_handle: Option<tauri::AppHandle>) -> Arc<Self> {
-        let (tx, rx) = mpsc::channel::<String>(64);
+        let (tx, rx) = mpsc::channel::<Arc<String>>(64);
 
         let queue = Arc::new(Self {
             sender: tx,
@@ -94,13 +94,14 @@ impl DownloadQueue {
     }
 
     pub async fn enqueue(&self, version: String) {
+        let version = Arc::new(version);
         if let Some(state) = self.active.get(&version)
             && state.is_active()
         {
             return;
         }
 
-        info!("{} encolada", &version);
+        info!("{} encolada", &*version);
 
         self.active
             .insert(version.clone(), DownloadState::new(version.clone()));
@@ -124,7 +125,7 @@ impl DownloadQueue {
 
     // ── Worker ────────────────────────────────────────────────────────────────
 
-    async fn worker(mut rx: mpsc::Receiver<String>, queue: Arc<DownloadQueue>) {
+    async fn worker(mut rx: mpsc::Receiver<Arc<String>>, queue: Arc<DownloadQueue>) {
         while let Some(version) = rx.recv().await {
             let shared_dir = PathManager::get().get_shared_dir().to_path_buf();
             let manager = DownloadManager::new(shared_dir);
@@ -164,49 +165,11 @@ impl DownloadQueue {
 
             let (tx, mut progress_rx) = mpsc::channel::<DownloadProgress>(100);
 
-            // Monitor inline con join! — sin spawn extra
-            let monitor = async {
-                let mut interval = tokio::time::interval(std::time::Duration::from_millis(75));
-                interval.tick().await;
-                let mut latest: Option<DownloadProgress> = None;
-
-                loop {
-                    tokio::select! {
-                        biased;
-                        _ = interval.tick() => {
-                            if let Some(ref p) = latest {
-                                emit(AppEvent::DProgress {
-                                    version: version.clone(),
-                                    current: p.current as u32,
-                                    total: p.total as u32,
-                                    d_type: format!("{:?}", p.download_type),
-                                });
-                            }
-                        }
-                        maybe = progress_rx.recv() => {
-                            match maybe {
-                                Some(progress) => {
-                                    if let Some(mut state) = queue.active.get_mut(&version) {
-                                        state.current = progress.current as u64;
-                                        state.total = progress.total as u64;
-                                    }
-                                    latest = Some(progress);
-                                }
-                                None => break,
-                            }
-                        }
-                    }
-                }
-
-                if let Some(p) = latest {
-                    emit(AppEvent::DProgress {
-                        version: version.clone(),
-                        current: p.current as u32,
-                        total: p.total as u32,
-                        d_type: format!("{:?}", p.download_type),
-                    });
-                }
-            };
+            let monitor = monitor_download_progress(
+                version.clone(),
+                progress_rx,
+                queue.clone(),
+            );
 
             let (dl_result, ()) = tokio::join!(download_handle.download_all(Some(tx)), monitor);
 
@@ -279,7 +242,7 @@ impl Launcher {
         let version = handle.get_version().await;
         let name = handle.get_name().await;
         let shared_dir = PathManager::get().get_shared_dir().to_path_buf();
-        let instance_dir = PathManager::get().get_instance_dir().join(&name);
+        let instance_dir = PathManager::get().get_instance_dir().join(name.as_ref());
 
         if !instance_dir.exists() {
             fs::create_dir(&instance_dir)
@@ -298,7 +261,7 @@ impl Launcher {
                 "Versión {} no descargada, encolando descarga automática...",
                 version
             );
-            DownloadQueue::get().enqueue(version.clone()).await;
+            DownloadQueue::get().enqueue((*version).clone()).await;
             handle.set_status(InstanceStatus::Off);
             return Err(AppError::Instance(InstanceError::NotFound));
         }
@@ -312,47 +275,15 @@ impl Launcher {
 
         if !java_path.exists() {
             handle.set_status(InstanceStatus::Error(
-                InstanceError::JreDoesntExists(java_version.to_string()).to_string(),
+                InstanceError::JreNotFound(java_version.to_string()).to_string(),
             ));
-            return Err(AppError::Instance(InstanceError::JreDoesntExists(
+            return Err(AppError::Instance(InstanceError::JreNotFound(
                 java_version.to_string(),
             )))?;
         }
 
         // Auto-refresh del token Microsoft — el lock de settings se toma y suelta rápido
-        if user.user_type == AccountType::Microsoft
-            && let Some(refresh_token) = &user.refresh_token
-        {
-            info!("Refrescando token de Microsoft...");
-            let rt = refresh_token.clone();
-            let refresh_result = tokio::task::spawn_blocking(move || {
-                MicrosoftAuth::default()
-                    .refresh_token(&rt)
-                    .map_err(|e| e.to_string())
-            })
-            .await
-            .map_err(|e| AuthError::AuthFailed(e.to_string()))?;
-
-            match refresh_result {
-                Ok(new_user) => {
-                    info!("Token refrescado para {}", new_user.username);
-                    user = new_user;
-                    if let Err(e) = user.save_tokens() {
-                        warn!("Error guardando tokens: {:?}", e);
-                    }
-                    SettingsManager::write(|settings| {
-                        settings.set_user(user.clone());
-                    })?;
-                    SettingsManager::save().await?;
-                }
-                Err(e) => {
-                    warn!(
-                        "No se pudo refrescar el token: {}. Continuando con el actual...",
-                        e
-                    );
-                }
-            }
-        }
+        user = refresh_microsoft_token(user).await?;
 
         let min_mem = format!("{}G", settings_m.get_min_memory());
         let max_mem = format!("{}G", settings_m.get_max_memory());
@@ -390,65 +321,20 @@ impl Launcher {
 
                 let loader = handle.to_dto().await.loader;
                 discord_presence::on_instance_start(
-                    instance_name.clone(),
-                    instance_version.clone(),
-                    loader,
+                    instance_name.to_string(),
+                    instance_version.to_string(),
+                    loader.into_owned(),
                 )
                 .await;
 
                 {
                     let guard = self.app_handle.lock().unwrap_or_else(|e| e.into_inner());
                     if let Some(ref app) = *guard {
+                        let id = handle.uuid.clone();
                         let stdout_rx = lw_handle.subscribe_stdout();
                         let stderr_rx = lw_handle.subscribe_stderr();
-                        let id = handle.uuid.clone();
-
-                        let app_stdout = app.clone();
-                        let id_stdout = id.clone();
-                        tokio::spawn(async move {
-                            let mut rx = stdout_rx;
-                            while let Ok(line) = rx.recv().await {
-                                if line.to_lowercase().contains("token") {
-                                    continue;
-                                }
-                                if app_stdout
-                                    .emit(
-                                        "instance-console-output",
-                                        serde_json::json!({
-                                            "id": id_stdout,
-                                            "line": line,
-                                            "stream": "stdout"
-                                        }),
-                                    )
-                                    .is_err()
-                                {
-                                    break;
-                                }
-                            }
-                        });
-
-                        let app_stderr = app.clone();
-                        tokio::spawn(async move {
-                            let mut rx = stderr_rx;
-                            while let Ok(line) = rx.recv().await {
-                                if line.to_lowercase().contains("token") {
-                                    continue;
-                                }
-                                if app_stderr
-                                    .emit(
-                                        "instance-console-output",
-                                        serde_json::json!({
-                                            "id": id,
-                                            "line": line,
-                                            "stream": "stderr"
-                                        }),
-                                    )
-                                    .is_err()
-                                {
-                                    break;
-                                }
-                            }
-                        });
+                        spawn_io_forwarding(app.clone(), id.clone(), stdout_rx, "stdout");
+                        spawn_io_forwarding(app.clone(), id, stderr_rx, "stderr");
                     } else {
                         warn!("AppHandle no disponible, no se reenviará stdout/stderr");
                     }
@@ -484,6 +370,125 @@ impl Launcher {
             }
         }
         Ok(())
+    }
+}
+
+async fn refresh_microsoft_token(mut user: MinecraftUser) -> Result<MinecraftUser, AppError> {
+    if user.user_type == AccountType::Microsoft
+        && let Some(refresh_token) = &user.refresh_token
+    {
+        info!("Refrescando token de Microsoft...");
+        let rt = refresh_token.clone();
+        let refresh_result = tokio::task::spawn_blocking(move || {
+            MicrosoftAuth::default()
+                .refresh_token(&rt)
+                .map_err(|e| e.to_string())
+        })
+        .await
+        .map_err(|e| AuthError::AuthFailed(e.to_string()))?;
+
+        match refresh_result {
+            Ok(new_user) => {
+                info!("Token refrescado para {}", new_user.username);
+                user = new_user;
+                if let Err(e) = user.save_tokens() {
+                    warn!("Error guardando tokens: {:?}", e);
+                }
+                SettingsManager::write(|settings| {
+                    settings.set_user(user.clone());
+                })?;
+                SettingsManager::save().await?;
+            }
+            Err(e) => {
+                warn!(
+                    "No se pudo refrescar el token: {}. Continuando con el actual...",
+                    e
+                );
+            }
+        }
+    }
+    Ok(user)
+}
+
+fn spawn_io_forwarding(
+    app: tauri::AppHandle,
+    id: Arc<String>,
+    mut rx: broadcast::Receiver<String>,
+    stream: &'static str,
+) {
+    tokio::spawn(async move {
+        while let Ok(line) = rx.recv().await {
+            if line.to_lowercase().contains("token") {
+                continue;
+            }
+            if app
+                .emit(
+                    "instance-console-output",
+                    serde_json::json!({ "id": id, "line": line, "stream": stream }),
+                )
+                .is_err()
+            {
+                break;
+            }
+        }
+    });
+}
+
+fn d_type_str(t: &DownloadProgressType) -> &'static str {
+    match t {
+        DownloadProgressType::Library => "Library",
+        DownloadProgressType::Asset => "Asset",
+        DownloadProgressType::Native => "Native",
+        DownloadProgressType::Client => "Client",
+        DownloadProgressType::Verifying => "Verifying",
+        DownloadProgressType::Generic => "Generic",
+    }
+}
+
+async fn monitor_download_progress(
+    version: Arc<String>,
+    mut progress_rx: mpsc::Receiver<DownloadProgress>,
+    queue: Arc<DownloadQueue>,
+) {
+    let mut interval = tokio::time::interval(std::time::Duration::from_millis(75));
+    interval.tick().await;
+    let mut latest: Option<DownloadProgress> = None;
+
+    loop {
+        tokio::select! {
+            biased;
+            _ = interval.tick() => {
+                if let Some(ref p) = latest {
+                    emit(AppEvent::DProgress {
+                        version: version.clone(),
+                        current: p.current as u32,
+                        total: p.total as u32,
+                        d_type: Cow::Borrowed(d_type_str(&p.download_type)),
+                    });
+                }
+            }
+            maybe = progress_rx.recv() => {
+                match maybe {
+                    Some(progress) => {
+                        if let Some(mut state) = queue.active.get_mut(&version) {
+                            state.current = progress.current as u64;
+                            state.total = progress.total as u64;
+                        }
+                        latest = Some(progress);
+                    }
+                    None => break,
+                }
+            }
+        }
+    }
+
+    if let Some(p) = latest {
+        emit(AppEvent::DProgress {
+            version: version.clone(),
+            current: p.current as u32,
+            total: p.total as u32,
+            d_type: Cow::Borrowed(d_type_str(&p.download_type)),
+        });
     }
 }
 
@@ -528,21 +533,21 @@ mod tests {
 
     #[test]
     fn test_download_state_pending() {
-        let s = DownloadState::new("1.21".into());
+        let s = DownloadState::new(Arc::new("1.21".into()));
         assert_eq!(s.status, DownloadStatus::Pending);
         assert!(s.is_active());
     }
 
     #[test]
     fn test_download_state_not_active_done() {
-        let mut s = DownloadState::new("1.21".into());
+        let mut s = DownloadState::new(Arc::new("1.21".into()));
         s.status = DownloadStatus::Done;
         assert!(!s.is_active());
     }
 
     #[test]
     fn test_download_state_not_active_error() {
-        let mut s = DownloadState::new("1.21".into());
+        let mut s = DownloadState::new(Arc::new("1.21".into()));
         s.status = DownloadStatus::Error("err".into());
         assert!(!s.is_active());
     }

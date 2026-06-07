@@ -2,7 +2,7 @@ use crate::core::{AppError, FsError, PathManager};
 use aqua::{JrePackage, JreStatus, ZuluApi};
 use std::path::{Path, PathBuf};
 use tokio::fs;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 pub struct JavaManager;
 
@@ -172,7 +172,9 @@ impl JavaManager {
                         subdir, dest_dir
                     );
                     Self::move_contents(&subdir, dest_dir)?;
-                    fs::remove_dir_all(&subdir).await.ok();
+                    if let Err(e) = fs::remove_dir_all(&subdir).await {
+                        warn!("Error al eliminar directorio temporal {:?}: {}", subdir, e);
+                    }
                     return Ok(());
                 }
             }
@@ -197,12 +199,20 @@ impl JavaManager {
             let dest_path = dest.join(&file_name);
 
             if entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
-                std::fs::create_dir_all(&dest_path).ok();
+                if let Err(e) = std::fs::create_dir_all(&dest_path) {
+                    warn!("Error al crear directorio {:?}: {}", dest_path, e);
+                }
                 Self::move_contents(&src_path, &dest_path)?;
-                std::fs::remove_dir_all(&src_path).ok();
+                if let Err(e) = std::fs::remove_dir_all(&src_path) {
+                    warn!("Error al eliminar directorio fuente {:?}: {}", src_path, e);
+                }
             } else if dest_path.exists() {
-                std::fs::remove_file(&dest_path).ok();
-                std::fs::rename(&src_path, &dest_path).ok();
+                if let Err(e) = std::fs::remove_file(&dest_path) {
+                    warn!("Error al eliminar archivo destino {:?}: {}", dest_path, e);
+                }
+                if let Err(e) = std::fs::rename(&src_path, &dest_path) {
+                    warn!("Error al renombrar {:?} -> {:?}: {}", src_path, dest_path, e);
+                }
             } else {
                 std::fs::rename(&src_path, &dest_path).map_err(|e| {
                     AppError::Fs(FsError::Rename {

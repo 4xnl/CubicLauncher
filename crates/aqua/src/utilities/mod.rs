@@ -1,9 +1,7 @@
 use std::path::Path;
 use std::sync::LazyLock;
 
-#[cfg(feature = "extract-natives")]
-use log::debug;
-use log::{error, info, warn};
+use log::{debug, error, warn};
 use reqwest::Client;
 use sha1::{Digest, Sha1};
 use tokio::io::AsyncWriteExt;
@@ -29,7 +27,7 @@ pub async fn download_file(url: &str, path: &Path, expected_hash: &str) -> Resul
         if !expected_hash.is_empty() {
             match verify_file_hash(path, expected_hash).await {
                 Ok(true) => {
-                    info!("File OK (hash match): {:?}", path);
+                    debug!("File OK (hash match): {:?}", path);
                     return Ok(());
                 }
                 Ok(false) => {
@@ -42,7 +40,7 @@ pub async fn download_file(url: &str, path: &Path, expected_hash: &str) -> Resul
                 }
             }
         } else {
-            info!("File exists (no hash to verify): {:?}", path);
+            debug!("File exists (no hash to verify): {:?}", path);
             return Ok(());
         }
     }
@@ -147,7 +145,7 @@ pub async fn download_file(url: &str, path: &Path, expected_hash: &str) -> Resul
 
         // Atomic rename
         tokio::fs::rename(&temp_file, path).await?;
-        info!("Downloaded: {:?}", path);
+        debug!("Downloaded: {:?}", path);
         return Ok(());
     }
 
@@ -218,7 +216,7 @@ pub(crate) fn extract_native_jar_sync(jar_path: &Path, destino: &Path) -> Result
 
         let mut out_file = std::fs::File::create(&out_path)?;
         std::io::copy(&mut entry, &mut out_file)?;
-        info!("Extracted native: {} -> {}", file_name, destino.display());
+        debug!("Extracted native: {} -> {}", file_name, destino.display());
     }
 
     Ok(())

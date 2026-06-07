@@ -2,6 +2,7 @@ use crate::core::path_manager::PathManager;
 use crate::core::{AppEvent, FsError, InstanceError, emit};
 use crate::services::SettingsManager;
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::io;
 use std::path::PathBuf;
@@ -78,14 +79,14 @@ impl AtomicStatus {
 
 #[derive(Debug, Serialize, Deserialize)]
 struct InstanceData {
-    name: String,
-    version: String,
+    name: Arc<String>,
+    version: Arc<String>,
     last_played: u64,
     min_memory: Option<u32>,
     max_memory: Option<u32>,
     cover_image: Option<PathBuf>,
-    icon: Option<String>,
-    uuid: String,
+    icon: Option<Arc<String>>,
+    uuid: Arc<String>,
     #[serde(skip)]
     dirty: bool,
 }
@@ -93,19 +94,19 @@ struct InstanceData {
 impl InstanceData {
     fn new(name: String, version: String, icon: Option<String>) -> Self {
         Self {
-            name,
-            version,
+            name: Arc::new(name),
+            version: Arc::new(version),
             last_played: 0,
             min_memory: None,
             max_memory: None,
             cover_image: None,
-            icon,
-            uuid: uuid::Uuid::new_v4().to_string(),
+            icon: icon.map(Arc::new),
+            uuid: Arc::new(uuid::Uuid::new_v4().to_string()),
             dirty: true,
         }
     }
 
-    fn get_loader(&self) -> &str {
+    fn get_loader(&self) -> &'static str {
         if self.version.contains("fabric") {
             return "Fabric";
         }
@@ -119,7 +120,7 @@ impl InstanceData {
     }
 
     fn get_instance_dir(&self) -> PathBuf {
-        PathManager::get().get_instance_dir().join(&self.name)
+        PathManager::get().get_instance_dir().join(self.name.as_ref())
     }
 
     async fn save(&mut self) -> Result<(), io::Error> {
@@ -153,7 +154,7 @@ impl InstanceData {
 
 #[derive(Clone)]
 pub struct InstanceHandle {
-    pub uuid: String,
+    pub uuid: Arc<String>,
     data: Arc<RwLock<InstanceData>>,
     status: Arc<AtomicStatus>,
 }
@@ -202,11 +203,11 @@ impl InstanceHandle {
 
     // ── Lecturas de data ──────────────────────────────────────────────────
 
-    pub async fn get_name(&self) -> String {
+    pub async fn get_name(&self) -> Arc<String> {
         self.data.read().await.name.clone()
     }
 
-    pub async fn get_version(&self) -> String {
+    pub async fn get_version(&self) -> Arc<String> {
         self.data.read().await.version.clone()
     }
 
@@ -234,7 +235,7 @@ impl InstanceHandle {
         self.data.read().await.cover_image.clone()
     }
 
-    pub async fn get_icon(&self) -> Option<String> {
+    pub async fn get_icon(&self) -> Option<Arc<String>> {
         self.data.read().await.icon.clone()
     }
 
@@ -243,12 +244,12 @@ impl InstanceHandle {
         InstanceDto {
             name: data.name.clone(),
             version: data.version.clone(),
-            loader: data.get_loader().to_string(),
+            loader: Cow::Borrowed(data.get_loader()),
             last_played: data.last_played,
-            status: self.get_status(), // sin await — AtomicU8
+            status: self.get_status(),
             cover_image: data.cover_image.clone(),
             icon: data.icon.clone(),
-            uuid: self.uuid.clone(), // sin await — campo directo
+            uuid: self.uuid.clone(),
             path: data.get_instance_dir(),
         }
     }
@@ -257,19 +258,19 @@ impl InstanceHandle {
 
     pub async fn set_name(&self, name: String) {
         let mut data = self.data.write().await;
-        data.name = name;
+        data.name = Arc::new(name);
         data.dirty = true;
     }
 
     pub async fn set_version(&self, version: String) {
         let mut data = self.data.write().await;
-        data.version = version;
+        data.version = Arc::new(version);
         data.dirty = true;
     }
 
     pub async fn set_icon(&self, icon: Option<String>) {
         let mut data = self.data.write().await;
-        data.icon = icon;
+        data.icon = icon.map(Arc::new);
         data.dirty = true;
     }
 
@@ -330,7 +331,7 @@ impl InstanceManager {
 
         let mut guard = manager.instances.write().await;
         for handle in handles.into_iter().flatten() {
-            guard.insert(handle.uuid.clone(), handle);
+            guard.insert(handle.uuid.to_string(), handle);
         }
         drop(guard);
 
@@ -395,7 +396,7 @@ impl InstanceManager {
         self.instances
             .write()
             .await
-            .insert(handle.uuid.clone(), handle.clone());
+            .insert(handle.uuid.to_string(), handle.clone());
 
         Ok(handle)
     }
@@ -424,7 +425,7 @@ impl InstanceManager {
             .await
             .values()
             .filter(|h| h.is_busy())
-            .map(|h| h.uuid.clone())
+            .map(|h| h.uuid.to_string())
             .collect()
     }
 
@@ -462,9 +463,9 @@ impl InstanceManager {
             validate_instance_name(&name)?;
 
             let old_name = handle.get_name().await;
-            if old_name != name {
+            if &*old_name != &name {
                 let base_dir = PathManager::get().get_instance_dir();
-                let old_dir = base_dir.join(&old_name);
+                let old_dir = base_dir.join(&*old_name);
                 let new_dir = base_dir.join(&name);
 
                 if new_dir.exists() {
@@ -533,14 +534,14 @@ pub fn signal_kill(uuid: &str) -> bool {
 
 #[derive(Serialize, Clone)]
 pub struct InstanceDto {
-    pub name: String,
-    pub version: String,
-    pub loader: String,
+    pub name: Arc<String>,
+    pub version: Arc<String>,
+    pub loader: Cow<'static, str>,
     pub last_played: u64,
     pub status: InstanceStatus,
     pub cover_image: Option<PathBuf>,
-    pub icon: Option<String>,
-    pub uuid: String,
+    pub icon: Option<Arc<String>>,
+    pub uuid: Arc<String>,
     pub path: PathBuf,
 }
 

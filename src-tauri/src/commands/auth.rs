@@ -1,3 +1,4 @@
+use crate::core::errors::{AuthError, CoreError};
 use crate::services::SettingsManager;
 use launchwerk::auth::{MinecraftUser, microsoft::MicrosoftAuth};
 use serde::Serialize;
@@ -19,10 +20,10 @@ pub async fn get_device_code() -> Result<DeviceCode, String> {
     let res = tokio::task::spawn_blocking(|| {
         MicrosoftAuth::default()
             .get_device_code()
-            .map_err(|e| e.to_string())
+            .map_err(|e| AuthError::DeviceCodeFailed(e.to_string()).to_string())
     })
     .await
-    .map_err(|e| e.to_string())??;
+    .map_err(|e| AuthError::SpawnBlocking(e.to_string()).to_string())??;
 
     info!(
         "Código de dispositivo obtenido: user_code={}",
@@ -47,15 +48,15 @@ pub async fn authenticate_with_device_code(
     let user = tokio::task::spawn_blocking(move || {
         MicrosoftAuth::default()
             .authenticate_with_device_code(&device_code, interval, expires_in)
-            .map_err(|e| e.to_string())
+            .map_err(|e| AuthError::AuthFailed(e.to_string()).to_string())
     })
     .await
-    .map_err(|e| format!("Task failed: {}", e))??;
+    .map_err(|e| AuthError::SpawnBlocking(e.to_string()).to_string())??;
 
     info!("Autenticación exitosa para {}", user.username);
 
     user.save_tokens()
-        .map_err(|e| format!("Failed to save tokens securely: {}", e))?;
+        .map_err(|e| AuthError::SaveTokensFailed(e.to_string()).to_string())?;
 
     SettingsManager::write(|settings| {
         settings.add_user(user.clone());
@@ -98,7 +99,7 @@ pub async fn switch_user(idx: usize) -> Result<(), String> {
     {
         let settings = SettingsManager::read();
         if idx >= settings.user.len() {
-            return Err(format!("Índice {} fuera de rango ({} usuarios)", idx, settings.user.len()));
+            return Err(CoreError::Other(format!("Índice {} fuera de rango ({} usuarios)", idx, settings.user.len())).to_string());
         }
     }
     SettingsManager::write(|settings| {

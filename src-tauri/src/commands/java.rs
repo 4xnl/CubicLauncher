@@ -19,15 +19,15 @@ pub async fn get_jre_status(version: u8) -> Result<JreStatus, String> {
 
 #[command]
 pub async fn get_installing_jres() -> Vec<u8> {
-    INSTALLING_JRES.lock().unwrap().iter().copied().collect()
+    INSTALLING_JRES.lock().expect("poisoned INSTALLING_JRES lock").iter().copied().collect()
 }
 
 #[command]
 pub async fn install_jre(version: u8) -> Result<(), String> {
     info!("Installing JRE {}", version);
-    INSTALLING_JRES.lock().unwrap().insert(version);
+    INSTALLING_JRES.lock().expect("poisoned INSTALLING_JRES lock").insert(version);
     let result = JavaManager::install(version).await.map_err(|e| e.to_string());
-    INSTALLING_JRES.lock().unwrap().remove(&version);
+    INSTALLING_JRES.lock().expect("poisoned INSTALLING_JRES lock").remove(&version);
     result?;
     emit(AppEvent::DFinishRuntime {
         version: version.to_string(),

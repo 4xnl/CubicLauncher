@@ -1,3 +1,4 @@
+use crate::core::errors::{FsError, InstanceError};
 use crate::core::{AppEvent, PathManager, emit};
 use crate::services::{InstanceDto, InstanceManager, InstanceStatus, Launcher, signal_kill};
 use std::path::{Path, PathBuf};
@@ -10,11 +11,11 @@ fn validate_uuid(uuid: &str) -> Result<(), String> {
 
 fn sanitize_sub_path(instance_dir: &Path, sub_path: &Path) -> Result<PathBuf, String> {
     if sub_path.is_absolute() {
-        return Err("La ruta no puede ser absoluta".to_string());
+        return Err(FsError::InvalidPath(sub_path.to_string_lossy().to_string()).to_string());
     }
     for component in sub_path.components() {
         if matches!(component, std::path::Component::ParentDir) {
-            return Err("La ruta no puede contener '..'".to_string());
+            return Err(FsError::InvalidPath(sub_path.to_string_lossy().to_string()).to_string());
         }
     }
     Ok(instance_dir.join(sub_path))
@@ -61,7 +62,7 @@ pub async fn launch(instance_id: String) -> Result<(), String> {
     let manager = InstanceManager::get();
     let Some(handle) = manager.get_handle(&instance_id).await else {
         error!("Instancia {} no encontrada para lanzar", instance_id);
-        return Err("Instancia no encontrada".to_string());
+        return Err(InstanceError::NotFound.to_string());
     };
 
     Launcher::get().launch(handle.clone()).await.map_err(|e| {
@@ -83,7 +84,7 @@ pub async fn kill_instance(uuid: String) -> Result<(), String> {
     let handle = manager
         .get_handle(&uuid)
         .await
-        .ok_or_else(|| "Instancia no encontrada".to_string())?;
+        .ok_or_else(|| InstanceError::NotFound.to_string())?;
 
     if !signal_kill(&uuid) {
         warn!("Instancia {} no estaba corriendo, forzando Off", uuid);
@@ -120,7 +121,7 @@ pub async fn create_instance(
         Ok(d) => {
             info!("Instancia creada: uuid={}", d.uuid);
             emit(AppEvent::InstanceCreated {
-                id: d.uuid.clone(),
+                id: d.uuid.to_string(),
                 dto: d.to_dto().await,
             });
             Ok(())
@@ -228,7 +229,7 @@ pub async fn get_instance_banner(instance_id: String) -> Option<String> {
         return Some(path.to_string_lossy().to_string());
     }
 
-    get_instance_screenshot(handle.get_name().await).await
+    get_instance_screenshot(handle.get_name().await.to_string()).await
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -244,7 +245,7 @@ pub async fn open_instance_dir(id: String, sub_dir: Option<String>) -> Result<()
             "Intento de abrir directorio de instancia {} no encontrada",
             id
         );
-        return Err("Instancia no encontrada".to_string());
+        return Err(InstanceError::NotFound.to_string());
     };
 
     let instance_dir = handle.get_instance_dir().await;
@@ -260,7 +261,7 @@ pub async fn open_instance_dir(id: String, sub_dir: Option<String>) -> Result<()
         && let Err(e) = tokio::fs::create_dir_all(&path).await
     {
         error!("No se pudo crear el directorio {:?}: {}", path, e);
-        return Err(format!("No se pudo crear el directorio: {}", e));
+        return Err(FsError::CreateDir { path: path.to_string_lossy().to_string(), source: e }.to_string());
     }
 
     #[cfg(target_os = "windows")]
@@ -462,7 +463,7 @@ pub async fn get_instance_mods(id: String) -> Vec<ModDto> {
                 version: md_version,
                 description: md_desc,
                 authors: md_authors,
-                icon: md_icon,
+                icon: md_icon.map(|s| (*s).clone()),
                 enabled: entry.enabled,
             }
         })
@@ -485,7 +486,7 @@ pub async fn toggle_instance_mod(id: String, filename: String, enable: bool) -> 
     let manager = InstanceManager::get();
     let Some(handle) = manager.get_handle(&id).await else {
         error!("Instancia {} no encontrada para toggle mod", id);
-        return Err("Instancia no encontrada".to_string());
+        return Err(InstanceError::NotFound.to_string());
     };
 
     let mods_dir = handle.get_instance_dir().await.join("mods");
@@ -493,7 +494,7 @@ pub async fn toggle_instance_mod(id: String, filename: String, enable: bool) -> 
 
     if !file_path.exists() {
         error!("Mod '{}' no encontrado en instancia {}", filename, id);
-        return Err("Mod no encontrado".to_string());
+        return Err(InstanceError::ModNotFound.to_string());
     }
 
     let is_currently_disabled = filename.ends_with(".disabled");
@@ -501,7 +502,7 @@ pub async fn toggle_instance_mod(id: String, filename: String, enable: bool) -> 
     if enable && is_currently_disabled {
         let new_filename = filename
             .strip_suffix(".disabled")
-            .ok_or("Error al procesar el nombre del archivo")?;
+            .ok_or_else(|| InstanceError::FilenameParse.to_string())?;
         let new_path = mods_dir.join(new_filename);
         tokio::fs::rename(file_path, new_path)
             .await
@@ -574,7 +575,7 @@ pub async fn get_instance_resourcepacks(id: String) -> Vec<ModDto> {
             version: None,
             description: md_desc,
             authors: None,
-            icon: md_icon,
+            icon: md_icon.map(|s| (*s).clone()),
             enabled: true,
         });
     }
@@ -673,7 +674,7 @@ pub async fn delete_instance_file(
     let manager = InstanceManager::get();
     let Some(handle) = manager.get_handle(&id).await else {
         warn!("Instancia {} no encontrada para eliminar archivo", id);
-        return Err("Instancia no encontrada".to_string());
+        return Err(InstanceError::NotFound.to_string());
     };
 
     let instance_dir = handle.get_instance_dir().await;
@@ -683,7 +684,7 @@ pub async fn delete_instance_file(
     if file_path.exists() {
         tokio::fs::remove_file(&file_path).await.map_err(|e| {
             error!("Error eliminando archivo {:?}: {}", file_path, e);
-            e.to_string()
+            FsError::Remove { path: file_path.to_string_lossy().to_string(), source: e }.to_string()
         })?;
     } else {
         warn!("Archivo {:?} no existe, nada que eliminar", file_path);
@@ -701,7 +702,7 @@ pub async fn add_instance_file(
     let manager = InstanceManager::get();
     let Some(handle) = manager.get_handle(&id).await else {
         warn!("Instancia {} no encontrada para agregar archivo", id);
-        return Err("Instancia no encontrada".to_string());
+        return Err(InstanceError::NotFound.to_string());
     };
 
     let instance_dir = handle.get_instance_dir().await;
@@ -713,16 +714,16 @@ pub async fn add_instance_file(
     if !dest_dir.exists() {
         tokio::fs::create_dir_all(&dest_dir)
             .await
-            .map_err(|e| e.to_string())?;
+            .map_err(|e| FsError::CreateDir { path: dest_dir.to_string_lossy().to_string(), source: e }.to_string())?;
     }
 
     let src = PathBuf::from(&source_path);
-    let filename = src.file_name().ok_or("Ruta de origen inválida")?;
+    let filename = src.file_name().ok_or_else(|| InstanceError::InvalidSourcePath.to_string())?;
     let dest_path = dest_dir.join(filename);
 
     tokio::fs::copy(&src, &dest_path).await.map_err(|e| {
         error!("Error copiando archivo a {:?}: {}", dest_path, e);
-        e.to_string()
+        FsError::Copy { from: src.to_string_lossy().to_string(), to: dest_path.to_string_lossy().to_string(), source: e }.to_string()
     })?;
     info!("Archivo copiado a {:?}", dest_path);
     Ok(())
