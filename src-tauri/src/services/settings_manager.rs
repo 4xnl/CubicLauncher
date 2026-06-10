@@ -89,6 +89,8 @@ pub struct SettingsManager {
     pub theme: String,
     #[serde(default = "default_true")]
     pub discord_presence: bool,
+    #[serde(default = "default_true")]
+    pub show_tutorial: bool,
     #[serde(skip)]
     pub dirty: bool,
 }
@@ -122,6 +124,7 @@ impl Default for SettingsManager {
             env_vars: HashMap::new(),
             theme: String::from("dark"),
             discord_presence: true,
+            show_tutorial: true,
             dirty: true,
         }
     }

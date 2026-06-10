@@ -54,6 +54,7 @@ export interface Settings {
 	env_vars: Record<string, string>;
 	theme: string;
 	discord_presence: boolean;
+	show_tutorial: boolean;
 }
 
 export interface JreStatus {

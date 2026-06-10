@@ -51,6 +51,7 @@ export const launcherStore = $state<LauncherState>({
 		env_vars: {},
 		theme: "dark",
 		discord_presence: true,
+		show_tutorial: true,
 	},
 });
 

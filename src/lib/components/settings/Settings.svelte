@@ -174,20 +174,21 @@
 	</div>
 
 	<!-- Tab Navigation -->
-	<div class="qm-tabs">
+	<div class="qm-tabs" data-tutorial="settings-tabs">
 		{#each tabs as tab (tab)}
 			<button
 				type="button"
 				class="qm-tab-btn"
 				class:active={currentTab === tab.id}
 				onclick={() => (currentTab = tab.id)}
+				data-tutorial="tab-{tab.id}"
 			>
 				<span class="qm-tab-label">{tab.label}</span>
 			</button>
 		{/each}
 	</div>
 
-	<div class="qm-scroll">
+	<div class="qm-scroll" data-tutorial="settings-scroll">
 		{#if currentTab === "launcher"}
 			<div class="section-group">
 				<CollapsibleSection

@@ -13,10 +13,12 @@
 	import InstanceView from "$lib/components/instances/InstanceView.svelte";
 	import Drawer from "$lib/components/layout/Drawer.svelte";
 	import NotificationContainer from "$lib/components/ui/NotificationContainer.svelte";
+	import Tutorial from "$lib/components/layout/welcome.svelte";
 	import { initDiscordPresence } from "$lib/api/cubicApi";
 	import { t } from "$lib/i18n";
 	import { applyTheme } from "$lib/api/themeManager";
 	import { checkForUpdates } from "$lib/api/updaterServices";
+	import { saveSettings } from "$lib/api/launcherService";
 	import CreateInstanceModal from "$lib/components/instances/CreateInstanceModal.svelte";
 
 	let selectedInstance = $state<InstanceDto | null>(null);
@@ -24,6 +26,7 @@
 	let versionDownloaderOpen = $state(false);
 	let openCreateModal = $state(false);
 
+	let showTutorial = $state(false);
 	let SettingsComponent = $state<Component<{ onclose: () => void }> | null>(
 		null,
 	);
@@ -35,6 +38,10 @@
 		initEventListeners();
 
 		await Promise.all([syncSettings(), getVersions()]);
+
+		if (launcherStore.settings.show_tutorial) {
+			showTutorial = true;
+		}
 
 		const firstInstance = launcherStore.loadedInstances[0];
 		if (firstInstance && !selectedInstance) {
@@ -58,6 +65,11 @@
 			VersionDownloaderComponent = v.default;
 		});
 	});
+
+	function onTutorialClose() {
+		launcherStore.settings.show_tutorial = false;
+		saveSettings();
+	}
 
 	$effect(() => {
 		const instances = launcherStore.loadedInstances;
@@ -116,5 +128,7 @@
 </Drawer>
 
 <CreateInstanceModal bind:open={openCreateModal} />
+
+<Tutorial bind:open={showTutorial} onclose={onTutorialClose} onopensettings={() => (quickMenuOpen = true)} />
 
 <NotificationContainer />

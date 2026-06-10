@@ -92,13 +92,13 @@
 </script>
 
 <aside class="sidebar">
-	<div class="sidebar-header">
+	<div class="sidebar-header" data-tutorial="sidebar-header">
 		<h1 style="font-size: 0.9rem; font-weight: bold;">CUBICLAUNCHER</h1>
 	</div>
 
 	<div class="sidebar-content">
 		<div class="section-label">{t("sidebar.yourInstances")}</div>
-		<div class="instance-list">
+		<div class="instance-list" data-tutorial="instance-list">
 			{#each launcherStore.loadedInstances as instance (instance.uuid)}
 				<div
 					class="instance-item"
@@ -186,11 +186,12 @@
 				iconSrc="/images/icons/sliders.svg"
 				storageKey="sidebar-tools"
 			>
-				<div class="tools-group">
+				<div class="tools-group" data-tutorial="tools-group">
 					<button
 						type="button"
 						class="tools-btn"
 						onclick={onopencreateinstance}
+						data-tutorial="create-instance"
 					>
 						<img
 							src="/images/icons/create.svg"
@@ -204,6 +205,7 @@
 						type="button"
 						class="tools-btn"
 						onclick={onopenversiondownloader}
+						data-tutorial="download-versions"
 					>
 						<img
 							src="/images/icons/download.svg"
@@ -217,6 +219,7 @@
 						type="button"
 						class="tools-btn"
 						onclick={onopenquickmenu}
+						data-tutorial="settings"
 					>
 						<img
 							src="/images/icons/settings.svg"
@@ -232,6 +235,7 @@
 
 		<div
 			class="user-profile"
+			data-tutorial="user-profile"
 			onclick={() => (showUserMenu = true)}
 			role="button"
 			tabindex="0"

@@ -6,3 +6,4 @@ build/
 *.lock
 !Cargo.lock
 target/
+bun.lock
