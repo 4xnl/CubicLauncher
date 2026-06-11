@@ -89,12 +89,16 @@ export async function applyTheme(themeId: string) {
 		const img = new Image();
 		currentImage = img;
 		img.onload = () => {
+			img.onload = null;
+			img.onerror = null;
 			if (gen !== currentGeneration || currentImage !== img) return;
 			currentImage = null;
 			root.style.setProperty("--bg-image", `url("${imgUrl}")`);
 			root.style.setProperty("--bg-image-loaded", "1");
 		};
 		img.onerror = () => {
+			img.onload = null;
+			img.onerror = null;
 			if (gen !== currentGeneration || currentImage !== img) return;
 			currentImage = null;
 			root.style.setProperty("--bg-image", "none");

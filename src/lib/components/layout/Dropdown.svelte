@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { fly } from "svelte/transition";
 	import { onMount } from "svelte";
+	import CheckIcon from "$lib/icons/CheckIcon.svelte";
+	import ChevronDownIcon from "$lib/icons/ChevronDownIcon.svelte";
 
 	interface Option {
 		value: string;
@@ -72,20 +74,7 @@
 		aria-haspopup="listbox"
 	>
 		<span class="dd-selected">{selectedLabel}</span>
-		<svg
-			class="dd-chevron"
-			class:dd-open={isOpen}
-			width="12"
-			height="12"
-			viewBox="0 0 16 16"
-			fill="none"
-			stroke="currentColor"
-			stroke-width="2"
-			stroke-linecap="round"
-			stroke-linejoin="round"
-		>
-			<path d="M4 6l4 4 4-4" />
-		</svg>
+		<ChevronDownIcon size={16} class="dd-chevron" />
 	</button>
 
 	{#if isOpen}
@@ -113,19 +102,7 @@
 						{/if}
 					</div>
 					{#if option.value === value}
-						<svg
-							class="dd-check"
-							width="12"
-							height="12"
-							viewBox="0 0 24 24"
-							fill="none"
-							stroke="currentColor"
-							stroke-width="3"
-							stroke-linecap="round"
-							stroke-linejoin="round"
-						>
-							<polyline points="20 6 9 17 4 12" />
-						</svg>
+						<CheckIcon size={14} class="dd-check" />
 					{/if}
 				</div>
 			{/each}

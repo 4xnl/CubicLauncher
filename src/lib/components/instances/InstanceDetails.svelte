@@ -3,11 +3,15 @@
 	import { t } from "$lib/i18n";
 	import { invoke } from "@tauri-apps/api/core";
 	import { listen } from "@tauri-apps/api/event";
+	import CopyIcon from "$lib/icons/CopyIcon.svelte";
 
 	interface ConsoleLine {
 		text: string;
 		stream: "stdout" | "stderr";
 		timestamp: number;
+		id: number;
+		level: string;
+		timeStr: string;
 	}
 
 	let { instance } = $props<{ instance: InstanceDto }>();
@@ -17,6 +21,10 @@
 	let logContainer: HTMLDivElement | undefined = $state();
 
 	const MAX_LINES = 2000;
+	let lineIdCounter = 0;
+
+	let pendingLines: ConsoleLine[] = [];
+	let flushId: number | null = null;
 	const isRunning = $derived(
 		instance.status === "started" || instance.status === "starting",
 	);
@@ -70,48 +78,14 @@
 		autoScroll = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
 	}
 
-	$effect(() => {
-		const id = instance.uuid;
-		if (!id) return;
-
-		lines = [];
-
-		const unlistenPromise = listen<{ id: string; line: string; stream: string }>(
-			"instance-console-output",
-			(event) => {
-				if (event.payload.id === id) {
-					const line: ConsoleLine = {
-						text: event.payload.line,
-						stream: event.payload.stream as "stdout" | "stderr",
-						timestamp: Date.now(),
-					};
-					lines = [...lines.slice(-(MAX_LINES - 1)), line];
-				}
-			},
-		).catch(() => {});
-
-		return () => {
-			unlistenPromise.then((unsub) => unsub?.());
-		};
-	});
-
-	$effect(() => {
-		if (autoScroll && logContainer) {
-			void lines;
-			requestAnimationFrame(() => {
-				if (logContainer) {
-					logContainer.scrollTop = logContainer.scrollHeight;
-				}
-			});
-		}
-	});
-
-	function fmtTime(ts: number): string {
-		const d = new Date(ts);
-		return d.toLocaleTimeString("en-US", { hour12: false });
+	function flushLines() {
+		if (pendingLines.length === 0) return;
+		lines = [...lines.slice(-(MAX_LINES - pendingLines.length)), ...pendingLines];
+		pendingLines = [];
+		flushId = null;
 	}
 
-	function lineLevel(text: string): string {
+	function computeLevel(text: string): string {
 		const m = text.match(/\[.*?\/(\w+)\]/);
 		if (m) {
 			const lv = m[1].toUpperCase();
@@ -138,6 +112,66 @@
 		if (/\b(INFO|CONFIG|DEBUG|TRACE)\b/.test(u)) return "info";
 		return "default";
 	}
+
+	const timeFmt = new Intl.DateTimeFormat("en-US", {
+		hour: "2-digit",
+		minute: "2-digit",
+		second: "2-digit",
+		hour12: false,
+	});
+
+	$effect(() => {
+		const id = instance.uuid;
+		if (!id) return;
+
+		lines = [];
+		lineIdCounter = 0;
+		pendingLines = [];
+		if (flushId !== null) {
+			cancelAnimationFrame(flushId);
+			flushId = null;
+		}
+
+		const unlistenPromise = listen<{ id: string; line: string; stream: string }>(
+			"instance-console-output",
+			(event) => {
+				if (event.payload.id === id) {
+					const line: ConsoleLine = {
+						text: event.payload.line,
+						stream: event.payload.stream as "stdout" | "stderr",
+						timestamp: Date.now(),
+						id: lineIdCounter++,
+						level: computeLevel(event.payload.line),
+						timeStr: timeFmt.format(new Date()),
+					};
+					pendingLines.push(line);
+					if (flushId === null) {
+						flushId = requestAnimationFrame(flushLines);
+					}
+				}
+			},
+		).catch(() => {});
+
+		return () => {
+			unlistenPromise.then((unsub) => unsub?.());
+			if (flushId !== null) {
+				cancelAnimationFrame(flushId);
+				flushId = null;
+			}
+			pendingLines = [];
+		};
+	});
+
+	$effect(() => {
+		if (autoScroll && logContainer) {
+			void lines;
+			requestAnimationFrame(() => {
+				if (logContainer) {
+					logContainer.scrollTop = logContainer.scrollHeight;
+				}
+			});
+		}
+	});
 </script>
 
 <div class="details-panel">
@@ -307,27 +341,7 @@
 					disabled={lines.length === 0}
 					title="Copy"
 				>
-					<svg
-						width="13"
-						height="13"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="2"
-						stroke-linecap="round"
-						stroke-linejoin="round"
-					>
-						<rect
-							x="9"
-							y="9"
-							width="13"
-							height="13"
-							rx="2"
-							ry="2"
-						/><path
-							d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"
-						/>
-					</svg>
+					<CopyIcon size={13} />
 				</button>
 				<button
 					type="button"
@@ -389,12 +403,12 @@
 					<span>{t("instanceView.console.waiting")}</span>
 				</div>
 			{:else}
-				{#each lines as line, i (i)}
+				{#each lines as line (line.id)}
 					<div
-						class="console-line {lineLevel(line.text)}"
+						class="console-line {line.level}"
 						class:stderr={line.stream === "stderr"}
 					>
-						<span class="line-ts">{fmtTime(line.timestamp)}</span>
+						<span class="line-ts">{line.timeStr}</span>
 						<span class="line-text">{line.text}</span>
 					</div>
 				{/each}
@@ -594,6 +608,7 @@
 		background: #66bb6a;
 		box-shadow: 0 0 8px rgba(102, 187, 106, 0.5);
 		animation: pulse-dot 1.5s ease-in-out infinite;
+		will-change: opacity;
 	}
 
 	.console-toolbar {
@@ -641,6 +656,7 @@
 		color: #66bb6a;
 		border: 1px solid rgba(76, 175, 80, 0.3);
 		animation: pulse-badge 2s ease-in-out infinite;
+		will-change: opacity;
 	}
 
 	.console-viewport {
@@ -685,6 +701,8 @@
 		padding: 1px 14px;
 		min-height: 20px;
 		transition: background 0.1s ease;
+		content-visibility: auto;
+		contain-intrinsic-size: 20px;
 	}
 
 	.console-line:hover {
@@ -745,6 +763,7 @@
 		border-radius: 50%;
 		background: var(--text-secondary);
 		animation: dot-bounce 1.2s ease-in-out infinite;
+		will-change: transform;
 	}
 
 	.waiting-dots span:nth-child(2) {

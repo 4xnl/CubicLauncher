@@ -514,6 +514,7 @@
 	:global(.banner-status-icon-rotate) {
 		color: var(--accent);
 		animation: rotate 1.2s linear infinite;
+		will-change: transform;
 		height: 32px;
 		width: 32px;
 	}

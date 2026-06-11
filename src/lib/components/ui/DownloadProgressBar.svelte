@@ -4,6 +4,9 @@
 	import type { AppEvent } from "$lib/types/types";
 	import { getDownloadQueue } from "$lib/api/cubicApi";
 	import { SvelteMap } from "svelte/reactivity";
+	import CheckIcon from "$lib/icons/CheckIcon.svelte";
+	import DownloadIcon from "$lib/icons/DownloadIcon.svelte";
+	import ChevronDownIcon from "$lib/icons/ChevronDownIcon.svelte";
 
 	type SegmentKey = "Library" | "Asset" | "Native" | "Client";
 	const SEGMENTS: SegmentKey[] = ["Library", "Asset", "Native", "Client"];
@@ -43,7 +46,7 @@
 		};
 	}
 
-	let downloads = $state<Map<string, DownloadItem>>(new Map());
+	let downloads = new SvelteMap<string, DownloadItem>();
 	let expanded = $state(false);
 	let activeCount = $derived(
 		[...downloads.values()].filter((d) => !d.done).length,
@@ -65,7 +68,6 @@
 				}
 			}
 			if (queue.length > 0) {
-				downloads = new SvelteMap(downloads);
 				expanded = true;
 			}
 		});
@@ -87,7 +89,6 @@
 					existing.activeType = key;
 					existing.done = false;
 					downloads.set(version, { ...existing });
-					downloads = new SvelteMap(downloads);
 					if (isNew) expanded = true;
 					break;
 				}
@@ -100,11 +101,9 @@
 							done: true,
 							activeType: null,
 						});
-						downloads = new SvelteMap(downloads);
 					}
 					setTimeout(() => {
 						downloads.delete(version);
-						downloads = new SvelteMap(downloads);
 					}, 4000);
 					break;
 				}
@@ -148,66 +147,20 @@
 				<span class="dl-tray-spinner"></span>
 				<span>{activeCount} descargando</span>
 			{:else if doneCount > 0}
-				<svg
-					width="13"
-					height="13"
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="currentColor"
-					stroke-width="2.5"
-					stroke-linecap="round"
-					stroke-linejoin="round"
-					><polyline points="20 6 9 17 4 12" /></svg
-				>
+				<CheckIcon size={13} />
 				<span>{doneCount} completadas</span>
 			{:else}
-				<svg
-					width="13"
-					height="13"
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="currentColor"
-					stroke-width="2"
-					stroke-linecap="round"
-					stroke-linejoin="round"
-					><path
-						d="M12 15V3m0 12l-4-4m4 4l4-4M2 17l.621 2.485A2 2 0 0 0 4.561 21h14.878a2 2 0 0 0 1.94-1.515L22 17"
-					/></svg
-				>
+				<DownloadIcon size={13} />
 				<span>Sin descargas</span>
 			{/if}
 		</div>
-		<svg
-			class="dl-tray-chevron"
-			width="11"
-			height="11"
-			viewBox="0 0 16 16"
-			fill="none"
-			stroke="currentColor"
-			stroke-width="2"
-			stroke-linecap="round"
-			stroke-linejoin="round"
-		>
-			<path d="M4 6l4 4 4-4" />
-		</svg>
+		<ChevronDownIcon size={11} class="dl-tray-chevron" />
 	</button>
 
 	<div class="dl-tray-body">
 		{#if downloads.size === 0}
 			<div class="dl-tray-empty">
-				<svg
-					width="26"
-					height="26"
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="currentColor"
-					stroke-width="1.5"
-					stroke-linecap="round"
-					stroke-linejoin="round"
-					><path
-						d="M12 15V3m0 12l-4-4m4 4l4-4M2 17l.621 2.485A2 2 0 0 0 4.561 21h14.878a2 2 0 0 0 1.94-1.515L22 17"
-					/></svg
-				>
+				<DownloadIcon size={26} />
 				<span class="dl-tray-empty-title">No hay descargas activas</span
 				>
 				<span class="dl-tray-empty-sub"
@@ -221,17 +174,7 @@
 					<div class="dl-tray-item-header">
 						<div class="dl-tray-item-left">
 							{#if item.done}
-								<svg
-									width="10"
-									height="10"
-									viewBox="0 0 24 24"
-									fill="none"
-									stroke="var(--color-success)"
-									stroke-width="2.5"
-									stroke-linecap="round"
-									stroke-linejoin="round"
-									><polyline points="20 6 9 17 4 12" /></svg
-								>
+								<CheckIcon size={10} />
 							{:else}
 								<span class="dl-tray-spinner-sm"></span>
 							{/if}
@@ -354,6 +297,7 @@
 		border-top-color: var(--text-muted);
 		border-radius: 50%;
 		animation: dl-spin 0.7s linear infinite;
+		will-change: transform;
 		flex-shrink: 0;
 	}
 
@@ -364,6 +308,7 @@
 		border-top-color: var(--text-muted);
 		border-radius: 50%;
 		animation: dl-spin 0.7s linear infinite;
+		will-change: transform;
 		flex-shrink: 0;
 	}
 

@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { fly } from "svelte/transition";
 	import { onMount } from "svelte";
+	import CheckIcon from "$lib/icons/CheckIcon.svelte";
+	import ChevronDownIcon from "$lib/icons/ChevronDownIcon.svelte";
 
 	interface Option {
 		value: string;
@@ -109,19 +111,7 @@
 		bind:this={triggerEl}
 	>
 		<span class="selected-value">{selectedLabel}</span>
-		<svg
-			class="chevron-icon"
-			width="12"
-			height="12"
-			viewBox="0 0 16 16"
-			fill="none"
-			stroke="currentColor"
-			stroke-width="2"
-			stroke-linecap="round"
-			stroke-linejoin="round"
-		>
-			<path d="M4 6l4 4 4-4" />
-		</svg>
+		<ChevronDownIcon size={16} class="chevron-icon" />
 	</button>
 
 	{#if isOpen}
@@ -145,18 +135,7 @@
 				>
 					{option.label}
 					{#if option.value === value}
-						<svg
-							class="check-icon"
-							width="12"
-							height="12"
-							viewBox="0 0 24 24"
-							fill="none"
-							stroke="currentColor"
-							stroke-width="3"
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							><polyline points="20 6 9 17 4 12"></polyline></svg
-						>
+						<CheckIcon size={14} class="check-icon" />
 					{/if}
 				</div>
 			{/each}

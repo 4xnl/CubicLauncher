@@ -55,6 +55,8 @@ export const launcherStore = $state<LauncherState>({
 	},
 });
 
+const MAX_NOTIFICATIONS = 5;
+
 export function addNotification(
 	title: string,
 	message: string,
@@ -65,7 +67,7 @@ export function addNotification(
 	const notification: Notification = { id, title, message, type, timeout };
 
 	launcherStore.notifications = [
-		...launcherStore.notifications,
+		...launcherStore.notifications.slice(-(MAX_NOTIFICATIONS - 1)),
 		notification,
 	];
 

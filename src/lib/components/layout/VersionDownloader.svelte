@@ -22,6 +22,9 @@
 	import { launcherStore } from "$lib/state/state.svelte";
 	import { t } from "$lib/i18n";
 	import { SvelteSet } from "svelte/reactivity";
+	import CheckIcon from "$lib/icons/CheckIcon.svelte";
+
+	const dateFmt = new Intl.DateTimeFormat(undefined, { dateStyle: "medium" });
 
 	interface Props {
 		onclose?: () => void;
@@ -263,7 +266,7 @@
 					stroke-linejoin="round"
 					class:spin={refreshing}
 					style={refreshing
-						? "animation: spin 1s linear infinite;"
+						? "animation: spin 1s linear infinite; will-change: transform;"
 						: ""}
 				>
 					<polyline points="23 4 23 10 17 10"></polyline>
@@ -429,27 +432,16 @@
 											? "STABLE"
 											: "UNSTABLE"}
 									{:else}
-										{version.type} • {new Date(
+										{version.type} • {dateFmt.format(new Date(
 											version.releaseTime,
-										).toLocaleDateString()}
+										))}
 									{/if}
 								</div>
 							</div>
 
 							{#if isInstalled}
 								<div class="inst-icon">
-									<svg
-										width="14"
-										height="14"
-										viewBox="0 0 24 24"
-										fill="none"
-										stroke="currentColor"
-										stroke-width="3"
-										stroke-linecap="round"
-										stroke-linejoin="round"
-										><polyline points="20 6 9 17 4 12"
-										></polyline></svg
-									>
+									<CheckIcon size={10} />
 								</div>
 							{:else if downloadingVersions.has(filter === "fabric" ? version.version : version.id)}
 								<button
@@ -536,6 +528,7 @@
 		border-top-color: var(--text-muted);
 		border-radius: 50%;
 		animation: dl-spin 0.7s linear infinite;
+		will-change: transform;
 		flex-shrink: 0;
 	}
 

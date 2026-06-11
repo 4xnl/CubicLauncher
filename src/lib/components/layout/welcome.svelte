@@ -3,6 +3,7 @@
 	import { t } from "$lib/i18n";
 	import { launcherStore } from "$lib/state/state.svelte";
 	import { saveSettings } from "$lib/api/launcherService";
+	import CloseIcon from "$lib/icons/CloseIcon.svelte";
 
 	interface Step {
 		sel: string;
@@ -198,10 +199,7 @@
 		<div class="tut-arrow"></div>
 
 		<button type="button" class="tut-close" onclick={close} aria-label={t("tutorial.skip")}>
-			<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
-				<line x1="18" y1="6" x2="6" y2="18"></line>
-				<line x1="6" y1="6" x2="18" y2="18"></line>
-			</svg>
+			<CloseIcon size={20} />
 		</button>
 
 		<div class="tut-body">

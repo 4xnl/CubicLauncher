@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { slide } from "svelte/transition";
 	import type { Snippet } from "svelte";
+	import ChevronDownIcon from "$lib/icons/ChevronDownIcon.svelte";
 
 	let {
 		title,
@@ -63,20 +64,7 @@
 			{/if}
 			<span class="cs-title">{title}</span>
 		</span>
-		<svg
-			class="cs-chevron"
-			class:open
-			width="16"
-			height="16"
-			viewBox="0 0 24 24"
-			fill="none"
-			stroke="currentColor"
-			stroke-width="2"
-			stroke-linecap="round"
-			stroke-linejoin="round"
-		>
-			<path d="M6 9l6 6 6-6" />
-		</svg>
+		<ChevronDownIcon size={16} class={"cs-chevron" + (open ? " open" : "")} />
 	</button>
 	{#if open}
 		<div class="cs-content" transition:slide={{ duration: 150 }}>
@@ -136,13 +124,13 @@
 		text-overflow: ellipsis;
 	}
 
-	.cs-chevron {
+	:global(.cs-chevron) {
 		color: var(--accent);
 		transition: transform 0.2s;
 		flex-shrink: 0;
 	}
 
-	.cs-chevron.open {
+	:global(.cs-chevron.open) {
 		transform: rotate(180deg);
 	}
 

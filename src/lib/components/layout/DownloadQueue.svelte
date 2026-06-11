@@ -6,6 +6,9 @@
 	import { getDownloadQueue } from "$lib/api/cubicApi";
 	import type { AppEvent } from "$lib/types/types";
 	import { t } from "$lib/i18n";
+	import CheckIcon from "$lib/icons/CheckIcon.svelte";
+	import DownloadIcon from "$lib/icons/DownloadIcon.svelte";
+	import ChevronDownIcon from "$lib/icons/ChevronDownIcon.svelte";
 
 	type SegKey = "Library" | "Asset" | "Native" | "Client";
 	const SEGS: SegKey[] = ["Library", "Asset", "Native", "Client"];
@@ -138,16 +141,14 @@
 				<span class="sd-spinner"></span>
 				<span class="sd-label">{activeCount} {t("sidebar.downloading")}</span>
 			{:else if doneCount > 0}
-				<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--color-success)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+				<CheckIcon size={12} color="var(--color-success)" />
 				<span class="sd-label">{doneCount} {t("sidebar.completed")}</span>
 			{:else}
-				<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-					<path d="M12 15V3m0 12l-4-4m4 4l4-4M2 17l.621 2.485A2 2 0 0 0 4.561 21h14.878a2 2 0 0 0 1.94-1.515L22 17" />
-				</svg>
+				<DownloadIcon size={18} />
 				<span class="sd-label">{t("sidebar.noDownloads")}</span>
 			{/if}
 		</span>
-		<svg class="sd-chevron" class:open={open} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6" /></svg>
+		<ChevronDownIcon size={16} class={"sd-chevron" + (open ? " open" : "")} />
 	</button>
 	{#if open}
 		<div class="sd-body" transition:slide={{ duration: 150 }}>
@@ -160,7 +161,7 @@
 						<div class="sd-item-header">
 							<span class="sd-item-left">
 								{#if item.done}
-									<svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="var(--color-success)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+									<CheckIcon size={8} />
 								{:else}
 									<span class="sd-spinner-sm"></span>
 								{/if}
@@ -232,6 +233,7 @@
 		border-top-color: var(--text-muted);
 		border-radius: 50%;
 		animation: sd-spin 0.7s linear infinite;
+		will-change: transform;
 		flex-shrink: 0;
 	}
 
@@ -242,6 +244,7 @@
 		border-top-color: var(--text-muted);
 		border-radius: 50%;
 		animation: sd-spin 0.7s linear infinite;
+		will-change: transform;
 		flex-shrink: 0;
 		display: block;
 	}
@@ -250,13 +253,13 @@
 		to { transform: rotate(360deg); }
 	}
 
-	.sd-chevron {
+	:global(.sd-chevron) {
 		color: var(--accent);
 		flex-shrink: 0;
 		transition: transform 0.2s;
 	}
 
-	.sd-chevron.open {
+	:global(.sd-chevron.open) {
 		transform: rotate(180deg);
 	}
 
@@ -347,7 +350,7 @@
 			padding: 8px 4px;
 		}
 
-		.sd-header .sd-chevron {
+		:global(.sd-header .sd-chevron) {
 			display: none;
 		}
 

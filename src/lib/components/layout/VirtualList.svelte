@@ -42,13 +42,13 @@
 	const start = $derived(Math.max(0, startIndex - buffer));
 	const end = $derived(Math.min(items.length - 1, endIndex + buffer));
 
-	const visibleItems = $derived(
-		items.slice(start, end + 1).map((item, i) => ({
-			item,
-			index: start + i,
-			top: (start + i) * itemHeight,
-		})),
-	);
+	const visibleItems = $derived.by(() => {
+		const result: Array<{ item: T; index: number; top: number }> = [];
+		for (let i = start; i <= end; i++) {
+			result.push({ item: items[i], index: i, top: i * itemHeight });
+		}
+		return result;
+	});
 
 	function handleScroll(e: Event) {
 		const target = e.target as HTMLDivElement;

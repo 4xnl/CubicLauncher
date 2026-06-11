@@ -8,6 +8,7 @@
 	import type { DeviceCode } from "$lib/types/types";
 	import { launcherStore } from "$lib/state/state.svelte";
 	import ModalBase from "./ModalBase.svelte";
+	import CopyIcon from "$lib/icons/CopyIcon.svelte";
 
 	let { open = $bindable(false) } = $props<{ open: boolean }>();
 
@@ -194,35 +195,9 @@
 									: "Copiar enlace"}
 							>
 								{#if copiedLink}
-									<svg
-										viewBox="0 0 24 24"
-										fill="none"
-										stroke="currentColor"
-										stroke-width="2"
-										width="16"
-										height="16"
-										><polyline points="20 6 9 17 4 12"
-										></polyline></svg
-									>
+									<CheckIcon size={16} />
 								{:else}
-									<svg
-										viewBox="0 0 24 24"
-										fill="none"
-										stroke="currentColor"
-										stroke-width="2"
-										width="16"
-										height="16"
-										><rect
-											x="9"
-											y="9"
-											width="13"
-											height="13"
-											rx="2"
-											ry="2"
-										></rect><path
-											d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"
-										></path></svg
-									>
+									<CopyIcon size={16} />
 								{/if}
 							</button>
 						</div>
@@ -249,35 +224,9 @@
 									: "Copiar código"}
 							>
 								{#if copiedCode}
-									<svg
-										viewBox="0 0 24 24"
-										fill="none"
-										stroke="currentColor"
-										stroke-width="2"
-										width="16"
-										height="16"
-										><polyline points="20 6 9 17 4 12"
-										></polyline></svg
-									>
+									<CheckIcon size={16} />
 								{:else}
-									<svg
-										viewBox="0 0 24 24"
-										fill="none"
-										stroke="currentColor"
-										stroke-width="2"
-										width="16"
-										height="16"
-										><rect
-											x="9"
-											y="9"
-											width="13"
-											height="13"
-											rx="2"
-											ry="2"
-										></rect><path
-											d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"
-										></path></svg
-									>
+									<CopyIcon size={16} />
 								{/if}
 							</button>
 						</div>
@@ -357,6 +306,7 @@
 		border-top-color: var(--accent);
 		border-radius: 50%;
 		animation: spin 0.8s linear infinite;
+		will-change: transform;
 		margin-bottom: 1.5rem;
 	}
 

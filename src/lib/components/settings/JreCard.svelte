@@ -279,6 +279,7 @@
 		border-right-color: transparent;
 		border-radius: 50%;
 		animation: qm-spin 0.6s linear infinite;
+		will-change: transform;
 		flex-shrink: 0;
 	}
 

@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { t } from "$lib/i18n";
+	import CheckIcon from "$lib/icons/CheckIcon.svelte";
+	import DownloadIcon from "$lib/icons/DownloadIcon.svelte";
 
 	let {
 		currentVersion,
@@ -92,20 +94,7 @@
 					onclick={onDownload}
 					title={t("settings.launcher.downloadInstallBtn")}
 				>
-					<svg
-						width="18"
-						height="18"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="2"
-						stroke-linecap="round"
-						stroke-linejoin="round"
-					>
-						<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-						<polyline points="7 10 12 15 17 10" />
-						<line x1="12" y1="15" x2="12" y2="3" />
-					</svg>
+					<DownloadIcon size={20} />
 				</button>
 			{:else if pendingUpdate && updateDownloaded}
 				<button
@@ -114,18 +103,7 @@
 					onclick={onInstall}
 					title={t("settings.launcher.installUpdateBtn")}
 				>
-					<svg
-						width="18"
-						height="18"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="2"
-						stroke-linecap="round"
-						stroke-linejoin="round"
-					>
-						<polyline points="20 6 9 17 4 12" />
-					</svg>
+					<CheckIcon size={16} />
 				</button>
 			{:else}
 				<button
@@ -273,6 +251,7 @@
 		border-top-color: var(--text-secondary);
 		border-radius: 50%;
 		animation: spin 0.7s linear infinite;
+		will-change: transform;
 		display: inline-block;
 	}
 

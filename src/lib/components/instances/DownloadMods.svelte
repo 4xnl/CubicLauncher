@@ -28,7 +28,7 @@
 	let sortIndex = $state<string>("downloads");
 
 	// Basket state
-	let basket = $state<Map<string, ModrinthProject>>(new Map());
+	let basket = new SvelteMap<string, ModrinthProject>();
 
 	// Details Panel state
 	let selectedMod = $state<ModrinthProject | null>(null);
@@ -43,7 +43,7 @@
 	let selectedModVersions = $state<ModrinthVersion[]>([]);
 	let selectedVersionId = $state<string>("");
 	let loadingVersions = $state(false);
-	let versionSelection = $state<Map<string, string>>(new Map());
+	let versionSelection = new SvelteMap<string, string>();
 
 	// Installed mods tracking
 	let installedModNames = $state<Set<string>>(new Set());
@@ -152,19 +152,15 @@
 	});
 
 	function toggleBasket(project: ModrinthProject) {
-		let newBasket = new SvelteMap(basket);
-		let newVersionSelection = new SvelteMap(versionSelection);
-		if (newBasket.has(project.project_id)) {
-			newBasket.delete(project.project_id);
-			newVersionSelection.delete(project.project_id);
+		if (basket.has(project.project_id)) {
+			basket.delete(project.project_id);
+			versionSelection.delete(project.project_id);
 		} else {
-			newBasket.set(project.project_id, project);
+			basket.set(project.project_id, project);
 			if (selectedVersionId) {
-				newVersionSelection.set(project.project_id, selectedVersionId);
+				versionSelection.set(project.project_id, selectedVersionId);
 			}
 		}
-		basket = newBasket;
-		versionSelection = newVersionSelection;
 	}
 
 	async function startReview() {
@@ -316,11 +312,7 @@
 					);
 					if (compatible) {
 						selectedVersionId = compatible.id;
-						let newVersionSelection = new SvelteMap(
-							versionSelection,
-						);
-						newVersionSelection.set(projectId, compatible.id);
-						versionSelection = newVersionSelection;
+						versionSelection.set(projectId, compatible.id);
 					}
 				}
 			}
@@ -330,13 +322,11 @@
 	}
 
 	function onVersionChange() {
-		let newVersionSelection = new SvelteMap(versionSelection);
 		if (selectedVersionId) {
-			newVersionSelection.set(selectedMod!.project_id, selectedVersionId);
+			versionSelection.set(selectedMod!.project_id, selectedVersionId);
 		} else {
-			newVersionSelection.delete(selectedMod!.project_id);
+			versionSelection.delete(selectedMod!.project_id);
 		}
-		versionSelection = newVersionSelection;
 	}
 
 	const versionDropdownOptions = $derived(
@@ -1083,6 +1073,7 @@
 
 	:global(.dm-spinning) {
 		animation: spin 0.8s linear infinite;
+		will-change: transform;
 	}
 	:global {
 		@keyframes spin {
