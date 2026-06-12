@@ -505,7 +505,7 @@
 	.path-text {
 		font-size: 0.68rem;
 		color: var(--text-secondary);
-		font-family: "Fira Code", "Cascadia Code", monospace;
+		font-family: "Cantarell", system-ui, sans-serif;
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
@@ -663,7 +663,7 @@
 		flex: 1;
 		overflow-y: auto;
 		padding: 8px 0;
-		font-family: "Fira Code", "Cascadia Code", "JetBrains Mono", monospace;
+		font-family: "Cantarell", system-ui, sans-serif;
 		font-size: 0.78rem;
 		line-height: 1.5;
 		background: #080808;

@@ -51,6 +51,7 @@
 	--sidebar-width: 260px;
 	--shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.5);
 	--shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
+	--font-family: "Cantarell", system-ui, sans-serif;
 	--glow-accent: 0 0 12px rgba(255, 255, 255, 0.15);
 	--color-success: #3fb950;
 	--color-success-rgb: 63, 185, 80;

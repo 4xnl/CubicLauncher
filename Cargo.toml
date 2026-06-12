@@ -5,6 +5,8 @@ members = [
     "crates/aqua",
     "crates/launchwerk",
     "crates/Communicator",
+    "crates/cubrinth",
+    "crates/zellkern",
 ]
 
 [profile.release]

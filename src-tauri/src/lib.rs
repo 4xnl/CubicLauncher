@@ -53,6 +53,8 @@ pub fn run() {
             commands::themes::import_theme,
             commands::themes::get_themes_dir_path,
             commands::modrinth::download_mods,
+            commands::pack::parse_mrpack,
+            commands::pack::install_mrpack,
             commands::discord::init_discord_presence,
             commands::java::get_jre_status,
             commands::java::install_jre,

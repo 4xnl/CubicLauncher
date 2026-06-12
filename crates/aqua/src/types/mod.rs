@@ -1,8 +1,7 @@
-mod loader;
 mod manifest;
 mod version;
 
-pub use loader::Loader;
+pub use zellkern::Loader;
 pub use manifest::{
     Argument, ArgumentValue, AssetIndex, DownloadEntry, JavaVersion, Library, LibraryArtifact,
     LibraryDownloads, Natives, OsRule, Rule, RuleAction, VersionArgType, VersionDownloads,

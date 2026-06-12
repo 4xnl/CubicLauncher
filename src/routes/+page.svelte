@@ -25,6 +25,8 @@
 	let quickMenuOpen = $state(false);
 	let versionDownloaderOpen = $state(false);
 	let openCreateModal = $state(false);
+	let droppedMrpackPath = $state<string | null>(null);
+	let isDragOver = $state(false);
 
 	let showTutorial = $state(false);
 	let SettingsComponent = $state<Component<{ onclose: () => void }> | null>(
@@ -64,7 +66,36 @@
 			SettingsComponent = s.default;
 			VersionDownloaderComponent = v.default;
 		});
+
+		setupDragDrop();
 	});
+
+	async function setupDragDrop() {
+		try {
+			const { getCurrentWebview } = await import("@tauri-apps/api/webview");
+			const webview = getCurrentWebview();
+			await webview.onDragDropEvent((event) => {
+				if (event.payload.type === "over") {
+					isDragOver = true;
+				} else if (event.payload.type === "leave") {
+					isDragOver = false;
+				} else if (event.payload.type === "drop") {
+					isDragOver = false;
+					const paths = event.payload.paths;
+					const mrpackFile = paths.find(
+						(p: string) =>
+							p.endsWith(".mrpack") || p.endsWith(".zip"),
+					);
+					if (mrpackFile) {
+						droppedMrpackPath = mrpackFile;
+						openCreateModal = true;
+					}
+				}
+			});
+		} catch (e) {
+			console.warn("Drag-drop not available, falling back:", e);
+		}
+	}
 
 	function onTutorialClose() {
 		launcherStore.settings.show_tutorial = false;
@@ -90,7 +121,17 @@
 	});
 </script>
 
-<div class="app-container">
+<div class="app-container" class:drag-over={isDragOver}>
+	{#if isDragOver}
+		<div class="drag-overlay">
+			<div class="drag-overlay-content">
+				<span>📦</span>
+				<h2>Suelta tu modpack</h2>
+				<p>Los archivos .mrpack se importarán automáticamente</p>
+			</div>
+		</div>
+	{/if}
+
 	<Sidebar
 		bind:selectedInstance
 		onopenquickmenu={() => (quickMenuOpen = true)}
@@ -127,8 +168,42 @@
 	/>
 </Drawer>
 
-<CreateInstanceModal bind:open={openCreateModal} />
+<CreateInstanceModal bind:open={openCreateModal} bind:mrpackPath={droppedMrpackPath} />
 
 <Tutorial bind:open={showTutorial} onclose={onTutorialClose} onopensettings={() => (quickMenuOpen = true)} />
 
 <NotificationContainer />
+
+<style>
+	.drag-overlay {
+		position: fixed;
+		inset: 0;
+		z-index: 9999;
+		background: rgba(0, 0, 0, 0.7);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		backdrop-filter: blur(4px);
+	}
+
+	.drag-overlay-content {
+		text-align: center;
+		color: white;
+	}
+
+	.drag-overlay-content span {
+		font-size: 3rem;
+		display: block;
+		margin-bottom: 16px;
+	}
+
+	.drag-overlay-content h2 {
+		font-size: 1.5rem;
+		margin-bottom: 8px;
+	}
+
+	.drag-overlay-content p {
+		font-size: 0.9rem;
+		opacity: 0.8;
+	}
+</style>

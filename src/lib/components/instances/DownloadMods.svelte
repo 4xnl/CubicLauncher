@@ -1600,7 +1600,7 @@
 		opacity: 0.6;
 	}
 	.dm-queue-filename {
-		font-family: monospace;
+		font-family: "Cantarell", system-ui, sans-serif;
 		font-size: 0.8rem;
 		color: var(--text-primary);
 		white-space: nowrap;

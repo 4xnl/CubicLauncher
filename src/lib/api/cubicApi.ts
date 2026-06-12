@@ -14,6 +14,7 @@ import {
 	type CurseForgeFile,
 	type JreStatus,
 	type McVersion,
+	type MrpackInfo,
 } from "../types/types";
 import { invoke } from "@tauri-apps/api/core";
 import { showError } from "../state/state.svelte";
@@ -645,5 +646,38 @@ export async function uninstallJre(version: number): Promise<void> {
 	} catch (err) {
 		console.error(`Error uninstalling JRE ${version}:`, err);
 		throw err;
+	}
+}
+
+export async function parseMrpack(
+	path: string,
+): Promise<MrpackInfo | null> {
+	try {
+		return await invoke<MrpackInfo>("parse_mrpack", { path });
+	} catch (err) {
+		console.error("Error parsing mrpack:", err);
+		showError("Error", `Failed to parse modpack: ${err}`);
+		return null;
+	}
+}
+
+export async function installMrpack(
+	path: string,
+	instanceName: string,
+	callback?: () => void,
+	onError?: (err: unknown) => void,
+): Promise<MrpackInfo | null> {
+	try {
+		const result = await invoke<MrpackInfo>("install_mrpack", {
+			path,
+			instanceName,
+		});
+		callback?.();
+		return result;
+	} catch (err) {
+		console.error("Error installing mrpack:", err);
+		showError("Error", `Failed to install modpack: ${err}`);
+		onError?.(err);
+		return null;
 	}
 }

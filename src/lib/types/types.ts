@@ -308,6 +308,17 @@ export interface CurseForgeModLoader {
 	slug: string;
 }
 
+export interface MrpackInfo {
+	name: string;
+	version_id: string;
+	summary: string | null;
+	minecraft_version: string | null;
+	loader: string | null;
+	loader_version: string | null;
+	file_count: number;
+	version_id_for_instance?: string | null;
+}
+
 export interface CurseForgeGameVersion {
 	id: number;
 	name: string;

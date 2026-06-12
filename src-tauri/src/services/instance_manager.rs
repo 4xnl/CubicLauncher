@@ -108,16 +108,7 @@ impl InstanceData {
     }
 
     fn get_loader(&self) -> &'static str {
-        if self.version.contains("fabric") {
-            return "Fabric";
-        }
-        if self.version.contains("forge") {
-            return "Forge";
-        }
-        if self.version.contains("quilt") {
-            return "Quilt";
-        }
-        "Vanilla"
+        zellkern::Loader::from_version_id(&self.version).name()
     }
 
     fn get_instance_dir(&self) -> PathBuf {

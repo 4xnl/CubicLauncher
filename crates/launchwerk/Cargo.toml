@@ -18,6 +18,7 @@ serde_json = "1.0.150"
 thiserror = "2.0.18"
 tokio = { version = "1.52.3", features = ["full"] }
 uuid = { version = "1.23.1", features = ["v4"] }
+zellkern = { path = "../zellkern" }
 zip = "8.6.0"
 reqwest = { version = "0.13", features = ["blocking", "json", "form"], optional = true }
 aes-gcm = { version = "0.10", optional = true }

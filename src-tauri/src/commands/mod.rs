@@ -5,5 +5,6 @@ pub mod instance;
 pub mod java;
 pub mod modrinth;
 pub mod others;
+pub mod pack;
 pub mod settings;
 pub mod themes;

@@ -436,7 +436,7 @@
 		display: flex;
 		align-items: center;
 		gap: 0.2rem;
-		font-family: "JetBrains Mono", "Courier New", monospace;
+		font-family: "Cantarell", system-ui, sans-serif;
 		font-size: 1.1rem;
 		font-weight: 800;
 		letter-spacing: 1px;
