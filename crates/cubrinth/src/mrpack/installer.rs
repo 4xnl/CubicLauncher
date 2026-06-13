@@ -4,6 +4,8 @@ use tokio::io::AsyncWriteExt;
 
 use super::pack_format::{MrpackMetadata, PackFormat};
 
+const USER_AGENT: &str = "CubicLauncher/27.0.1";
+
 #[derive(Debug, thiserror::Error)]
 pub enum MrpackError {
     #[error("ZIP error: {0}")]
@@ -77,7 +79,7 @@ pub async fn install_mrpack(
     let metadata = pack.extract_metadata();
 
     let client = reqwest::Client::builder()
-        .user_agent("CubicLauncher/27.0.1")
+        .user_agent(USER_AGENT)
         .build()
         .map_err(|e| MrpackError::Download(e.to_string()))?;
 

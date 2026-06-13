@@ -1,6 +1,7 @@
 use crate::core::path_manager::PathManager;
 use crate::core::{AppEvent, emit};
 use aqua::{DownloadManager, DownloadProgress, DownloadProgressType};
+use compact_str::CompactString;
 use dashmap::DashMap;
 use std::borrow::Cow;
 use std::sync::{Arc, OnceLock};
@@ -107,7 +108,7 @@ impl DownloadQueue {
     async fn worker(mut rx: mpsc::Receiver<Arc<str>>, queue: Arc<DownloadQueue>) {
         while let Some(version) = rx.recv().await {
             let shared_dir = PathManager::get().get_shared_dir().to_path_buf();
-            let manager = DownloadManager::new(shared_dir);
+            let manager = DownloadManager::new(shared_dir.clone());
 
             if let Some(mut state) = queue.active.get_mut(&version) {
                 state.status = DownloadStatus::Downloading;
@@ -116,29 +117,70 @@ impl DownloadQueue {
                 continue;
             }
 
-            let download_handle = match manager.prepare(&version).await {
-                Ok(h) => h,
-                Err(_) if version.starts_with("fabric-loader-") => {
-                    let gv = version.split('-').next_back().unwrap_or("");
-                    match manager.prepare(gv).await {
-                        Ok(h) => h,
-                        Err(_) => {
-                            let msg = format!("No se pudo resolver base {} para Fabric", gv);
-                            error!("{}", msg);
-                            if let Some(mut state) = queue.active.get_mut(&version) {
-                                state.status = DownloadStatus::Error(msg);
+            // Detect Forge versions: "{mc}-forge-{forge}"
+            let download_handle = if version.contains("-forge-") {
+                let parts: Vec<&str> = version.split("-forge-").collect();
+                if parts.len() == 2 {
+                    let gv = parts[0];
+                    let fv = parts[1];
+
+                    // Ensure base MC version exists before Forge post-processors run
+                    let mc_jar = shared_dir
+                        .join("versions")
+                        .join(gv)
+                        .join(format!("{gv}.jar"));
+                    if !mc_jar.exists() {
+                        info!(
+                            "Base MC {gv} jar not found, downloading before Forge..."
+                        );
+                        match manager.prepare(gv).await {
+                            Ok(base_handle) => {
+                                if let Err(e) = base_handle.download_all(None).await {
+                                    error!("Failed to download base MC {gv}: {:?}", e);
+                                }
                             }
+                            Err(e) => {
+                                error!("Failed to prepare base MC {gv}: {:?}", e);
+                            }
+                        }
+                    }
+
+                    let installer_url =
+                        aqua::ForgeBatch::resolve_installer_url(gv, fv);
+                    match aqua::ForgeBatch::new(&shared_dir, gv, fv, &installer_url).await {
+                        Ok(batch) => match manager.prepare_batch(Box::new(batch)).await {
+                            Ok(h) => h,
+                            Err(e) => {
+                                emit_and_set_error(&queue, &version, format!("No se pudo preparar Forge: {:?}", e));
+                                continue;
+                            }
+                        },
+                        Err(e) => {
+                            emit_and_set_error(&queue, &version, format!("No se pudo crear Forge batch: {:?}", e));
                             continue;
                         }
                     }
-                }
-                Err(_) => {
-                    let msg = format!("La versión solicitada no existe: {}", version);
-                    error!("{}", msg);
-                    if let Some(mut state) = queue.active.get_mut(&version) {
-                        state.status = DownloadStatus::Error(msg);
-                    }
+                } else {
+                    emit_and_set_error(&queue, &version, format!("Forge version format invalid: {}", version));
                     continue;
+                }
+            } else {
+                match manager.prepare(&version).await {
+                    Ok(h) => h,
+                    Err(_) if version.starts_with("fabric-loader-") => {
+                        let gv = version.split('-').next_back().unwrap_or("");
+                        match manager.prepare(gv).await {
+                            Ok(h) => h,
+                            Err(_) => {
+                                emit_and_set_error(&queue, &version, format!("No se pudo resolver base {} para Fabric", gv));
+                                continue;
+                            }
+                        }
+                    }
+                    Err(_) => {
+                        emit_and_set_error(&queue, &version, format!("La versión solicitada no existe: {}", version));
+                        continue;
+                    }
                 }
             };
 
@@ -157,11 +199,7 @@ impl DownloadQueue {
                     emit(AppEvent::DFinish { version });
                 }
                 Err(e) => {
-                    let msg = format!("No se pudo descargar {}: {:?}", version, e);
-                    error!("{}", msg);
-                    if let Some(mut state) = queue.active.get_mut(&version) {
-                        state.status = DownloadStatus::Error(msg);
-                    }
+                    emit_and_set_error(&queue, &version, format!("No se pudo descargar {}: {:?}", version, e));
                 }
             }
 
@@ -169,6 +207,17 @@ impl DownloadQueue {
         }
 
         error!("Worker de descargas terminó inesperadamente — el channel fue cerrado");
+    }
+}
+
+fn emit_and_set_error(queue: &DownloadQueue, version: &Arc<str>, msg: String) {
+    error!("{}", msg);
+    emit(AppEvent::DError {
+        version: version.clone(),
+        message: CompactString::from(&*msg),
+    });
+    if let Some(mut state) = queue.active.get_mut(version) {
+        state.status = DownloadStatus::Error(msg);
     }
 }
 
@@ -180,6 +229,7 @@ fn d_type_str(t: &DownloadProgressType) -> &'static str {
         DownloadProgressType::Client => "Client",
         DownloadProgressType::Verifying => "Verifying",
         DownloadProgressType::Generic => "Generic",
+        DownloadProgressType::Processing => "Processing",
     }
 }
 

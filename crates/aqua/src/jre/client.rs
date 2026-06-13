@@ -1,4 +1,4 @@
-use crate::errors::ProtonError;
+use crate::errors::AquaError;
 use crate::jre::types::{JrePackage, ZuluPackage};
 use crate::utilities::HTTP_CLIENT;
 use std::path::Path;
@@ -6,7 +6,7 @@ use std::path::Path;
 pub struct ZuluApi;
 
 impl ZuluApi {
-    pub async fn get_latest_package(java_version: u8) -> Result<JrePackage, ProtonError> {
+    pub async fn get_latest_package(java_version: u8) -> Result<JrePackage, AquaError> {
         let os = current_os();
         let arch = current_arch();
         let is_windows = cfg!(target_os = "windows");
@@ -35,7 +35,7 @@ impl ZuluApi {
                     p.name.ends_with(".tar.gz")
                 }
             })
-            .ok_or_else(|| ProtonError::Other(format!(
+            .ok_or_else(|| AquaError::Other(format!(
                 "No Zulu JRE ({}) found for Java {}",
                 if is_windows { "zip" } else { "tar.gz" },
                 java_version
@@ -60,7 +60,7 @@ impl ZuluApi {
     pub async fn download_and_extract(
         pkg: &JrePackage,
         dest_dir: &Path,
-    ) -> Result<(), ProtonError> {
+    ) -> Result<(), AquaError> {
         let extract_dir = dest_dir.parent().unwrap_or(dest_dir);
         tokio::fs::create_dir_all(extract_dir).await?;
 
@@ -75,7 +75,7 @@ impl ZuluApi {
         } else if pkg.is_zip() {
             "zip"
         } else {
-            return Err(ProtonError::Other(format!(
+            return Err(AquaError::Other(format!(
                 "Unknown archive format: {}",
                 pkg.filename
             )));
@@ -140,7 +140,7 @@ async fn extract_tar_gz(
     archive: &Path,
     dest: &Path,
     _filename: &str,
-) -> Result<(), ProtonError> {
+) -> Result<(), AquaError> {
     let archive = archive.to_path_buf();
     let dest = dest.to_path_buf();
 
@@ -149,23 +149,23 @@ async fn extract_tar_gz(
         let decoder = flate2::read::GzDecoder::new(file);
         let mut archive = tar::Archive::new(decoder);
         archive.unpack(&dest)?;
-        Ok::<_, ProtonError>(())
+        Ok::<_, AquaError>(())
     })
     .await?
 }
 
-async fn extract_zip(archive: &Path, dest: &Path, _filename: &str) -> Result<(), ProtonError> {
+async fn extract_zip(archive: &Path, dest: &Path, _filename: &str) -> Result<(), AquaError> {
     let dest = dest.to_path_buf();
     let archive = archive.to_path_buf();
 
     tokio::task::spawn_blocking(move || {
         let file = std::fs::File::open(&archive)?;
         let mut archive = zip::ZipArchive::new(file)
-            .map_err(|e| ProtonError::Other(format!("Failed to open ZIP: {}", e)))?;
+            .map_err(|e| AquaError::Other(format!("Failed to open ZIP: {}", e)))?;
 
         for i in 0..archive.len() {
             let mut entry = archive.by_index(i)
-                .map_err(|e| ProtonError::Other(format!("Failed to read ZIP entry: {}", e)))?;
+                .map_err(|e| AquaError::Other(format!("Failed to read ZIP entry: {}", e)))?;
 
             let name = entry.name().to_string();
             if name.ends_with('/') {
@@ -182,7 +182,7 @@ async fn extract_zip(archive: &Path, dest: &Path, _filename: &str) -> Result<(),
             std::io::copy(&mut entry, &mut out_file)?;
         }
 
-        Ok::<_, ProtonError>(())
+        Ok::<_, AquaError>(())
     })
     .await?
 }

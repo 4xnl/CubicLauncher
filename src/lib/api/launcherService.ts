@@ -1,4 +1,4 @@
-import { launcherStore, showError } from "../state/state.svelte";
+import { launcherStore, showErrorParsed } from "../state/state.svelte";
 import { listen } from "@tauri-apps/api/event";
 import type { AppEvent, InstanceDto, MinecraftUser } from "../types/types";
 import {
@@ -98,7 +98,7 @@ export async function killInst(uuid: string): Promise<void> {
 				launcherStore.runningInstances.filter((item) => item !== uuid);
 		});
 	} catch (err) {
-		console.error("Error al matar instancia:", err);
+		showErrorParsed(err);
 	}
 }
 
@@ -110,9 +110,7 @@ export async function deleteInst(uuid: string): Promise<void> {
 			(instance) => instance.uuid !== uuid,
 		);
 	} catch (err) {
-		console.error("Error al eliminar instancia:", err);
-
-		showError("Error", "No se pudo eliminar la instancia");
+		showErrorParsed(err);
 	}
 }
 
@@ -125,9 +123,7 @@ export async function renameInst(uuid: string, newName: string): Promise<void> {
 
 		await getVersions();
 	} catch (err) {
-		console.error("Error al renombrar instancia:", err);
-
-		showError("Error", "No se pudo renombrar la instancia");
+		showErrorParsed(err);
 	}
 }
 
@@ -147,9 +143,7 @@ export async function updateInst(
 
 		await getVersions();
 	} catch (err) {
-		console.error("Error al actualizar instancia:", err);
-
-		showError("Error", "No se pudo actualizar la instancia");
+		showErrorParsed(err);
 	}
 }
 

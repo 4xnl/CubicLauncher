@@ -205,10 +205,19 @@ impl<'a> CommandBuilder<'a> {
         cmd.push(format!("-Xms{}", self.config.min_ram));
         cmd.push(format!("-Xmx{}", self.config.max_ram));
 
+        let mut skip_next_cp_value = false;
         if let Some(args) = manifest.arguments.as_ref().and_then(|a| a.jvm.as_ref()) {
             for arg in args {
                 let tokens = arg.get_if_applies();
-                if tokens.len() == 2 && tokens[0] == "-cp" {
+                if tokens.is_empty() {
+                    continue;
+                }
+                if tokens[0] == "-cp" {
+                    skip_next_cp_value = true;
+                    continue;
+                }
+                if skip_next_cp_value {
+                    skip_next_cp_value = false;
                     continue;
                 }
                 if tokens.iter().any(|t| t.contains("${classpath}")) {
@@ -216,12 +225,16 @@ impl<'a> CommandBuilder<'a> {
                 }
                 for token in tokens {
                     let resolved = replace_vars(&token, vars);
-                    if resolved == "-cp" || resolved.contains("${classpath}") {
+                    if resolved.contains("${classpath}") {
                         continue;
                     }
                     cmd.push(resolved);
                 }
             }
+        }
+
+        for arg in &self.config.extra_jvm_args {
+            cmd.push(arg.clone());
         }
     }
 

@@ -6,7 +6,10 @@ use reqwest::Client;
 use sha1::{Digest, Sha1};
 use tokio::io::AsyncWriteExt;
 
-use crate::ProtonError;
+#[cfg(test)]
+use zellkern::is_native_file;
+
+use crate::AquaError;
 
 pub static HTTP_CLIENT: LazyLock<Client> = LazyLock::new(|| {
     Client::builder()
@@ -17,9 +20,9 @@ pub static HTTP_CLIENT: LazyLock<Client> = LazyLock::new(|| {
 
 const MAX_DOWNLOAD_ATTEMPTS: usize = 3;
 
-pub async fn download_file(url: &str, path: &Path, expected_hash: &str) -> Result<(), ProtonError> {
+pub async fn download_file(url: &str, path: &Path, expected_hash: &str) -> Result<(), AquaError> {
     if url.is_empty() {
-        return Err(ProtonError::Other("Empty download URL".into()));
+        return Err(AquaError::Other("Empty download URL".into()));
     }
 
     // Verify existing file
@@ -66,7 +69,7 @@ pub async fn download_file(url: &str, path: &Path, expected_hash: &str) -> Resul
                     MAX_DOWNLOAD_ATTEMPTS
                 );
                 if attempt == MAX_DOWNLOAD_ATTEMPTS {
-                    return Err(ProtonError::Other(format!("HTTP {}", r.status())));
+                    return Err(AquaError::Other(format!("HTTP {}", r.status())));
                 }
                 tokio::time::sleep(std::time::Duration::from_millis(100 * (1 << (attempt - 1))))
                     .await;
@@ -78,7 +81,7 @@ pub async fn download_file(url: &str, path: &Path, expected_hash: &str) -> Resul
                     attempt, MAX_DOWNLOAD_ATTEMPTS, e
                 );
                 if attempt == MAX_DOWNLOAD_ATTEMPTS {
-                    return Err(ProtonError::RequestError(e));
+                    return Err(AquaError::RequestError(e));
                 }
                 tokio::time::sleep(std::time::Duration::from_millis(100 * (1 << (attempt - 1))))
                     .await;
@@ -88,7 +91,7 @@ pub async fn download_file(url: &str, path: &Path, expected_hash: &str) -> Resul
 
         let mut file = match tokio::fs::File::create(&temp_file).await {
             Ok(f) => f,
-            Err(e) => return Err(ProtonError::IoError(e)),
+            Err(e) => return Err(AquaError::IoError(e)),
         };
 
         let mut hasher = Sha1::new();
@@ -117,7 +120,7 @@ pub async fn download_file(url: &str, path: &Path, expected_hash: &str) -> Resul
         if !write_ok {
             let _ = tokio::fs::remove_file(&temp_file).await;
             if attempt == MAX_DOWNLOAD_ATTEMPTS {
-                return Err(ProtonError::Other("Download stream failed".into()));
+                return Err(AquaError::Other("Download stream failed".into()));
             }
             continue;
         }
@@ -134,7 +137,7 @@ pub async fn download_file(url: &str, path: &Path, expected_hash: &str) -> Resul
                 );
                 let _ = tokio::fs::remove_file(&temp_file).await;
                 if attempt == MAX_DOWNLOAD_ATTEMPTS {
-                    return Err(ProtonError::HashMismatch {
+                    return Err(AquaError::HashMismatch {
                         expected: expected_hash.to_string(),
                         actual: actual_hash,
                     });
@@ -149,10 +152,10 @@ pub async fn download_file(url: &str, path: &Path, expected_hash: &str) -> Resul
         return Ok(());
     }
 
-    Err(ProtonError::Other("Download failed after retries".into()))
+    Err(AquaError::Other("Download failed after retries".into()))
 }
 
-pub async fn verify_file_hash(path: &Path, expected_hash: &str) -> Result<bool, ProtonError> {
+pub async fn verify_file_hash(path: &Path, expected_hash: &str) -> Result<bool, AquaError> {
     let mut file = tokio::fs::File::open(path).await?;
     let mut hasher = Sha1::new();
     let mut buf = [0u8; 8192];
@@ -170,77 +173,24 @@ pub async fn verify_file_hash(path: &Path, expected_hash: &str) -> Result<bool, 
 }
 
 #[cfg(feature = "extract-natives")]
-pub(crate) fn extract_native_jar_sync(jar_path: &Path, destino: &Path) -> Result<(), ProtonError> {
+pub(crate) fn extract_native_jar_sync(jar_path: &Path, destino: &Path) -> Result<(), AquaError> {
     if !jar_path.exists() {
-        return Err(ProtonError::Other(format!(
+        return Err(AquaError::Other(format!(
             "Native JAR not found: {:?}",
             jar_path
         )));
     }
-
     std::fs::create_dir_all(destino)?;
-
-    let file = std::fs::File::open(jar_path)?;
-    let mut archive = zip::ZipArchive::new(file)
-        .map_err(|e| ProtonError::Other(format!("Failed to open ZIP: {}", e)))?;
-
-    for i in 0..archive.len() {
-        let mut entry = match archive.by_index(i) {
-            Ok(e) => e,
-            Err(e) => {
-                warn!("Skipping entry {}: {}", i, e);
-                continue;
-            }
-        };
-
-        let name = entry.name().to_string();
-        if !is_native_file(&name) {
-            continue;
-        }
-
-        let file_name = Path::new(&name)
-            .file_name()
-            .unwrap_or_default()
-            .to_string_lossy()
-            .to_string();
-
-        if file_name.is_empty() {
-            continue;
-        }
-
-        let out_path = destino.join(&file_name);
-        if out_path.exists() && out_path.metadata().map(|m| m.len()).unwrap_or(0) == entry.size() {
-            debug!("Native already extracted: {}", out_path.display());
-            continue;
-        }
-
-        let mut out_file = std::fs::File::create(&out_path)?;
-        std::io::copy(&mut entry, &mut out_file)?;
-        debug!("Extracted native: {} -> {}", file_name, destino.display());
-    }
-
-    Ok(())
+    zellkern::extract_jar(jar_path, destino)
+        .map_err(|e| AquaError::Other(format!("Failed to extract native JAR: {e}")))
 }
 
 #[cfg(feature = "extract-natives")]
-pub async fn extract_native(jar_path: &Path, destino: &Path) -> Result<(), ProtonError> {
+pub async fn extract_native(jar_path: &Path, destino: &Path) -> Result<(), AquaError> {
     let jar_path = jar_path.to_path_buf();
     let destino = destino.to_path_buf();
 
     tokio::task::spawn_blocking(move || extract_native_jar_sync(&jar_path, &destino)).await?
-}
-
-#[cfg(feature = "extract-natives")]
-pub(crate) fn is_native_file(name: &str) -> bool {
-    let lower = name.to_lowercase();
-    if lower.starts_with("meta-inf") || lower.ends_with('/') {
-        return false;
-    }
-    lower.ends_with(".so")
-        || lower.ends_with(".dll")
-        || lower.ends_with(".dylib")
-        || lower.ends_with(".jnilib")
-        || lower.contains(".so.")
 }
 
 fn hex_encode(bytes: &[u8]) -> String {
@@ -249,6 +199,152 @@ fn hex_encode(bytes: &[u8]) -> String {
         s.push_str(&format!("{:02x}", b));
     }
     s
+}
+
+// ─── Forge utilities ──────────────────────────────────────────────────────────
+
+/// Extract a ZIP file to a destination directory (all files, no filtering).
+pub fn extract_zip_to_dir(zip_path: &Path, dest_dir: &Path) -> Result<(), AquaError> {
+    let file = std::fs::File::open(zip_path)
+        .map_err(|e| AquaError::ForgeExtract(format!("Cannot open ZIP: {e}")))?;
+    let mut archive = zip::ZipArchive::new(file)
+        .map_err(|e| AquaError::ForgeExtract(format!("Invalid ZIP: {e}")))?;
+
+    for i in 0..archive.len() {
+        let mut entry = archive
+            .by_index(i)
+            .map_err(|e| AquaError::ForgeExtract(format!("Cannot read ZIP entry: {e}")))?;
+
+        let name = entry.name().to_string();
+        if name.ends_with('/') {
+            continue;
+        }
+
+        let out_path = dest_dir.join(&name);
+        if let Some(parent) = out_path.parent() {
+            std::fs::create_dir_all(parent)
+                .map_err(|e| AquaError::ForgeExtract(format!("Cannot create dir: {e}")))?;
+        }
+
+        let mut out_file = std::fs::File::create(&out_path)
+            .map_err(|e| AquaError::ForgeExtract(format!("Cannot create file: {e}")))?;
+        std::io::copy(&mut entry, &mut out_file)
+            .map_err(|e| AquaError::ForgeExtract(format!("Cannot extract file: {e}")))?;
+    }
+
+    Ok(())
+}
+
+/// Read the Main-Class attribute from a JAR file's META-INF/MANIFEST.MF.
+pub fn read_jar_main_class(jar_path: &Path) -> Result<String, AquaError> {
+    let file = std::fs::File::open(jar_path).map_err(|e| {
+        AquaError::ForgeProcessor {
+            processor: jar_path.display().to_string(),
+            detail: format!("Cannot open JAR: {e}"),
+        }
+    })?;
+    let mut archive = zip::ZipArchive::new(file).map_err(|e| {
+        AquaError::ForgeProcessor {
+            processor: jar_path.display().to_string(),
+            detail: format!("Invalid JAR: {e}"),
+        }
+    })?;
+
+    let manifest = archive.by_name("META-INF/MANIFEST.MF").map_err(|e| {
+        AquaError::ForgeProcessor {
+            processor: jar_path.display().to_string(),
+            detail: format!("No MANIFEST.MF: {e}"),
+        }
+    })?;
+
+    let mut content = String::new();
+    std::io::Read::read_to_string(
+        &mut std::io::BufReader::new(manifest),
+        &mut content,
+    )
+    .map_err(|e| {
+        AquaError::ForgeProcessor {
+            processor: jar_path.display().to_string(),
+            detail: format!("Cannot read MANIFEST.MF: {e}"),
+        }
+    })?;
+
+    for line in content.lines() {
+        if let Some(mc) = line.strip_prefix("Main-Class:") {
+            return Ok(mc.trim().to_string());
+        }
+    }
+
+    Err(AquaError::ForgeProcessor {
+        processor: jar_path.display().to_string(),
+        detail: "No Main-Class in MANIFEST.MF".into(),
+    })
+}
+
+/// Run a Java process synchronously (blocking). Used for Forge post-processors.
+pub async fn run_java_process(
+    java_path: &Path,
+    classpath: &str,
+    main_class: &str,
+    args: Vec<String>,
+    processor_name: &str,
+) -> Result<(), AquaError> {
+    let java_path = java_path.to_path_buf();
+    let classpath = classpath.to_string();
+    let main_class = main_class.to_string();
+    let processor_name = processor_name.to_string();
+
+    let status = tokio::process::Command::new(&java_path)
+        .arg("-cp")
+        .arg(&classpath)
+        .arg(&main_class)
+        .args(&args)
+        .status()
+        .await
+        .map_err(|e| {
+            AquaError::ForgeProcessor {
+                processor: processor_name.clone(),
+                detail: format!("Failed to start Java: {e}"),
+            }
+        })?;
+
+    if !status.success() {
+        return Err(AquaError::ForgeProcessor {
+            processor: processor_name,
+            detail: format!("Process exited with code {}", status.code().unwrap_or(-1)),
+        });
+    }
+
+    Ok(())
+}
+
+/// Compute SHA1 hash of a file (synchronous, for post-processor output verification).
+pub fn compute_sha1_sync(path: &Path) -> Result<String, AquaError> {
+    use sha1::{Digest, Sha1};
+
+    let mut file = std::fs::File::open(path).map_err(|e| {
+        AquaError::ForgeOutputVerification {
+            file: path.display().to_string(),
+            expected: "N/A".into(),
+            actual: format!("Cannot open file: {e}"),
+        }
+    })?;
+    let mut hasher = Sha1::new();
+    let mut buf = [0u8; 8192];
+    loop {
+        let n = std::io::Read::read(&mut file, &mut buf).map_err(|e| {
+            AquaError::ForgeOutputVerification {
+                file: path.display().to_string(),
+                expected: "N/A".into(),
+                actual: format!("Read error: {e}"),
+            }
+        })?;
+        if n == 0 {
+            break;
+        }
+        hasher.update(&buf[..n]);
+    }
+    Ok(hex_encode(hasher.finalize().as_slice()))
 }
 
 #[cfg(test)]

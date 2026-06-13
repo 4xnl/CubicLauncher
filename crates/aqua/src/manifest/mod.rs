@@ -3,7 +3,7 @@ use crate::types::{
     NormalizedVersion, VersionAssets,
 };
 use crate::utilities::HTTP_CLIENT;
-use crate::ProtonError;
+use crate::AquaError;
 use zellkern::VersionManifest;
 use serde::Deserialize;
 
@@ -21,7 +21,7 @@ struct ManifestEntry {
     version_type: String,
 }
 
-async fn fetch_manifest_v2() -> Result<ManifestV2, ProtonError> {
+async fn fetch_manifest_v2() -> Result<ManifestV2, AquaError> {
     let resp = HTTP_CLIENT
         .get(MOJANG_MANIFEST_URL)
         .send()
@@ -31,44 +31,44 @@ async fn fetch_manifest_v2() -> Result<ManifestV2, ProtonError> {
     Ok(resp)
 }
 
-async fn fetch_version_json(url: &str) -> Result<VersionManifest, ProtonError> {
+async fn fetch_version_json(url: &str) -> Result<VersionManifest, AquaError> {
     let bytes = HTTP_CLIENT.get(url).send().await?.bytes().await?;
     Ok(VersionManifest::from_bytes(&bytes)?)
 }
 
-pub async fn resolve_version_data(version_id: &str) -> Result<NormalizedVersion, ProtonError> {
+pub async fn resolve_version_data(version_id: &str) -> Result<NormalizedVersion, AquaError> {
     let manifest = fetch_manifest_v2().await?;
 
     let entry = manifest
         .versions
         .into_iter()
         .find(|v| v.id == version_id)
-        .ok_or_else(|| ProtonError::VersionNotFound(version_id.to_string()))?;
+        .ok_or_else(|| AquaError::VersionNotFound(version_id.to_string()))?;
 
     let version = fetch_version_json(&entry.url).await?;
     resolve_normalized(version)
 }
 
-fn resolve_normalized(version: VersionManifest) -> Result<NormalizedVersion, ProtonError> {
+fn resolve_normalized(version: VersionManifest) -> Result<NormalizedVersion, AquaError> {
     let main_class = version
         .main_class
         .clone()
-        .ok_or(ProtonError::MainClassNotFound)?;
+        .ok_or(AquaError::MainClassNotFound)?;
 
     let asset_index = version
         .asset_index
         .as_ref()
-        .ok_or_else(|| ProtonError::Other("No asset index in manifest".into()))?;
+        .ok_or_else(|| AquaError::Other("No asset index in manifest".into()))?;
 
     let asset_index_url = asset_index
         .url
         .as_ref()
-        .ok_or_else(|| ProtonError::Other("No asset index URL".into()))?;
+        .ok_or_else(|| AquaError::Other("No asset index URL".into()))?;
 
     let asset_index_sha1 = asset_index
         .sha1
         .as_ref()
-        .ok_or_else(|| ProtonError::Other("No asset index SHA-1".into()))?;
+        .ok_or_else(|| AquaError::Other("No asset index SHA-1".into()))?;
 
     // Resolve client/server JARs from downloads field
     let client_jar = version
@@ -217,7 +217,7 @@ fn resolve_normalized(version: VersionManifest) -> Result<NormalizedVersion, Pro
 
 pub async fn resolve_asset_index(
     version: &NormalizedVersion,
-) -> Result<VersionAssets, ProtonError> {
+) -> Result<VersionAssets, AquaError> {
     let res = HTTP_CLIENT
         .get(&version.asset_index.url)
         .send()

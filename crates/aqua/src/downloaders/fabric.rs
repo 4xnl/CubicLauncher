@@ -7,7 +7,7 @@ use serde::Deserialize;
 
 use super::batch::{DownloadBatch, DownloadItemSpec};
 use crate::utilities::HTTP_CLIENT;
-use crate::ProtonError;
+use crate::AquaError;
 
 #[derive(Deserialize)]
 #[allow(dead_code)]
@@ -44,7 +44,7 @@ pub struct FabricBatch {
 }
 
 impl FabricBatch {
-    pub async fn resolve_latest_loader(game_version: &str) -> Result<String, ProtonError> {
+    pub async fn resolve_latest_loader(game_version: &str) -> Result<String, AquaError> {
         let loader_url = format!(
             "https://meta.fabricmc.net/v2/versions/loader/{}",
             game_version
@@ -53,24 +53,24 @@ impl FabricBatch {
             .get(&loader_url)
             .send()
             .await
-            .map_err(|e| ProtonError::Other(format!("Error fetching Fabric loaders: {}", e)))?;
+            .map_err(|e| AquaError::Other(format!("Error fetching Fabric loaders: {}", e)))?;
 
         let loaders: Vec<FabricLoaderResponse> = response
             .json()
             .await
-            .map_err(|e| ProtonError::Other(format!("Error parsing Fabric loaders: {}", e)))?;
+            .map_err(|e| AquaError::Other(format!("Error parsing Fabric loaders: {}", e)))?;
 
         loaders
             .first()
             .map(|r| r.loader.version.clone())
-            .ok_or_else(|| ProtonError::Other("No Fabric loader found for this version".into()))
+            .ok_or_else(|| AquaError::Other("No Fabric loader found for this version".into()))
     }
 
     pub async fn new(
         shared_dir: &Path,
         game_version: &str,
         loader_version: &str,
-    ) -> Result<Self, ProtonError> {
+    ) -> Result<Self, AquaError> {
         let fabric_version_id =
             format!("fabric-loader-{}-{}", loader_version, game_version);
 
@@ -83,13 +83,13 @@ impl FabricBatch {
             .get(&profile_url)
             .send()
             .await
-            .map_err(|e| ProtonError::Other(format!("Error fetching Fabric profile: {}", e)))?
+            .map_err(|e| AquaError::Other(format!("Error fetching Fabric profile: {}", e)))?
             .text()
             .await
-            .map_err(|e| ProtonError::Other(format!("Error reading Fabric profile: {}", e)))?;
+            .map_err(|e| AquaError::Other(format!("Error reading Fabric profile: {}", e)))?;
 
         let profile: FabricProfile = serde_json::from_str(&profile_text)
-            .map_err(|e| ProtonError::Other(format!("Error parsing Fabric profile: {}", e)))?;
+            .map_err(|e| AquaError::Other(format!("Error parsing Fabric profile: {}", e)))?;
 
         info!(
             "Fabric profile loaded: {} libraries for {}",
@@ -152,7 +152,7 @@ impl DownloadBatch for FabricBatch {
         &self.items
     }
 
-    fn prepare(&self) -> Pin<Box<dyn Future<Output = Result<(), ProtonError>> + Send + '_>> {
+    fn prepare(&self) -> Pin<Box<dyn Future<Output = Result<(), AquaError>> + Send + '_>> {
         let version_dir = self
             .shared_dir
             .join("versions")
@@ -166,10 +166,10 @@ impl DownloadBatch for FabricBatch {
             }
             tokio::fs::create_dir_all(&version_dir)
                 .await
-                .map_err(|e| ProtonError::Other(format!("Error creating version dir: {}", e)))?;
+                .map_err(|e| AquaError::Other(format!("Error creating version dir: {}", e)))?;
             tokio::fs::write(&json_path, &json)
                 .await
-                .map_err(|e| ProtonError::Other(format!("Error saving profile JSON: {}", e)))?;
+                .map_err(|e| AquaError::Other(format!("Error saving profile JSON: {}", e)))?;
             info!("Saved Fabric profile JSON: {:?}", json_path);
             Ok(())
         })

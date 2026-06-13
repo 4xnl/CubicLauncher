@@ -4,6 +4,7 @@ import type {
 	Notification,
 	NotificationType,
 } from "../types/types";
+import { t } from "$lib/i18n";
 
 export interface PendingUpdate {
 	version: string;
@@ -94,4 +95,17 @@ export function showWarning(title: string, message: string) {
 
 export function showInfo(title: string, message: string) {
 	return addNotification(title, message, "info", 4000);
+}
+
+export function showErrorParsed(rawError: unknown) {
+	try {
+		const parsed = JSON.parse(rawError as string);
+		if (parsed.code) {
+			const params = parsed.params || {};
+			const msg = t(`errors.${parsed.code}`, params);
+			addNotification(t("errors.title"), msg, "error", 8000);
+			return;
+		}
+	} catch {}
+	addNotification(t("errors.title"), String(rawError), "error", 8000);
 }

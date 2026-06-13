@@ -2,7 +2,10 @@ use std::future::Future;
 use std::path::PathBuf;
 use std::pin::Pin;
 
-use crate::ProtonError;
+use tokio::sync::mpsc::Sender;
+
+use crate::types::DownloadProgress;
+use crate::AquaError;
 
 #[derive(Debug, Clone)]
 pub struct DownloadItemSpec {
@@ -33,11 +36,14 @@ pub trait DownloadBatch: Send + Sync {
 
     fn items(&self) -> &[DownloadItemSpec];
 
-    fn prepare(&self) -> Pin<Box<dyn Future<Output = Result<(), ProtonError>> + Send + '_>> {
+    fn prepare(&self) -> Pin<Box<dyn Future<Output = Result<(), AquaError>> + Send + '_>> {
         Box::pin(async { Ok(()) })
     }
 
-    fn finalize(&self) -> Pin<Box<dyn Future<Output = Result<(), ProtonError>> + Send + '_>> {
+    fn finalize(
+        &self,
+        _progress_tx: Option<Sender<DownloadProgress>>,
+    ) -> Pin<Box<dyn Future<Output = Result<(), AquaError>> + Send + '_>> {
         Box::pin(async { Ok(()) })
     }
 }

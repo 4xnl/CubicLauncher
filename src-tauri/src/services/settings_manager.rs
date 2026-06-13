@@ -122,6 +122,7 @@ pub struct SettingsSnapshot {
     pub min_memory: u32,
     pub max_memory: u32,
     pub env_vars: HashMap<CompactString, String>,
+    pub jvm_args: CompactString,
     pub jre8_managed: bool,
     pub jre17_managed: bool,
     pub jre21_managed: bool,
@@ -151,9 +152,6 @@ impl Default for SettingsManager {
     fn default() -> Self {
         Self {
             user: {
-                // let mut vec = Vec::new();
-                // vec.push(MinecraftUser::cracked("Steve"));
-                // vec
                 let vec = vec![MinecraftUser::cracked("Steve")];
                 vec
             },
@@ -209,6 +207,7 @@ impl SettingsManager {
             min_memory: s.min_memory,
             max_memory: s.max_memory,
             env_vars: s.env_vars.clone(),
+            jvm_args: s.jvm_args.clone(),
             jre8_managed: s.jre8_managed,
             jre17_managed: s.jre17_managed,
             jre21_managed: s.jre21_managed,
@@ -227,22 +226,6 @@ impl SettingsManager {
     }
     pub fn get_max_memory(&self) -> u32 {
         self.max_memory
-    }
-    #[allow(dead_code)]
-    pub fn get_jre8_path(&self) -> &Path {
-        &self.jre8_path
-    }
-    #[allow(dead_code)]
-    pub fn get_jre17_path(&self) -> &Path {
-        &self.jre17_path
-    }
-    #[allow(dead_code)]
-    pub fn get_jre21_path(&self) -> &Path {
-        &self.jre21_path
-    }
-    #[allow(dead_code)]
-    pub fn get_jre25_path(&self) -> &Path {
-        &self.jre25_path
     }
 
     pub fn add_user(&mut self, user: MinecraftUser) {

@@ -29,6 +29,10 @@ pub enum AppEvent {
     DFinish {
         version: Arc<str>,
     },
+    DError {
+        version: Arc<str>,
+        message: CompactString,
+    },
     DFinishRuntime {
         version: CompactString,
     },

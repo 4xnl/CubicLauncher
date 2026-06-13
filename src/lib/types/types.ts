@@ -112,6 +112,12 @@ export interface FabricGameVersion {
 	stable: boolean;
 }
 
+export interface ForgeGameVersion {
+	version_id: string;
+	game_version: string;
+	forge_version: string;
+}
+
 export type AppEvent =
 	| {
 			type: "InstanceStarted";
@@ -151,6 +157,13 @@ export type AppEvent =
 			type: "DFinish";
 			data: {
 				version: string;
+			};
+	  }
+	| {
+			type: "DError";
+			data: {
+				version: string;
+				message: string;
 			};
 	  }
 	| {

@@ -78,6 +78,14 @@ impl<'a> ClasspathResolver<'a> {
                 if let Some(forge_jar) = self.find_forge_universal() {
                     self.push_if_exists(paths, &forge_jar);
                 }
+                let version_jar = self
+                    .lib_dir
+                    .parent()
+                    .unwrap_or(Path::new("."))
+                    .join("versions")
+                    .join(self.base_id)
+                    .join(format!("{}.jar", self.base_id));
+                self.push_if_exists(paths, &version_jar);
             }
             _ => {
                 let version_jar = self

@@ -17,6 +17,7 @@ pub struct LaunchConfig {
     pub access_token: Option<String>,
     pub auth_uuid: Option<String>,
     pub user_type: Option<String>,
+    pub extra_jvm_args: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -42,6 +43,7 @@ impl Default for LaunchConfig {
             access_token: None,
             auth_uuid: None,
             user_type: None,
+            extra_jvm_args: Vec::new(),
         }
     }
 }
@@ -104,6 +106,10 @@ impl LaunchConfigBuilder {
     }
     pub fn user_type(mut self, t: impl Into<String>) -> Self {
         self.0.user_type = Some(t.into());
+        self
+    }
+    pub fn extra_jvm_args(mut self, args: Vec<String>) -> Self {
+        self.0.extra_jvm_args = args;
         self
     }
     pub fn build(self) -> LaunchConfig {

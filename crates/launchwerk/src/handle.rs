@@ -119,6 +119,20 @@ impl InstanceHandle {
         if let Some(java_home) = config.java_path.parent() {
             cmd.env("JAVA_HOME", java_home);
         }
+
+        // ── Wayland → X11 fallback ────────────────────────────────────────
+        // GLFW 3.4 auto-detects Wayland when WAYLAND_DISPLAY is set, but
+        // Minecraft/Forge call glfwSetWindowPos() which Wayland doesn't
+        // support. Force X11 by breaking the Wayland detection.
+        if std::env::var("WAYLAND_DISPLAY").is_ok() {
+            info!("Wayland detected, forcing X11 for GLFW compatibility");
+            cmd.env("WAYLAND_DISPLAY", "")
+                .env("XDG_SESSION_TYPE", "x11");
+            if std::env::var("DISPLAY").is_err() {
+                cmd.env("DISPLAY", ":0");
+            }
+        }
+
         for (k, v) in &config.env {
             cmd.env(k, v);
         }

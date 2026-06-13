@@ -109,4 +109,5 @@ pub enum DownloadProgressType {
     Client,
     Verifying,
     Generic,
+    Processing,
 }

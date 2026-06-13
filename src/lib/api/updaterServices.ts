@@ -1,6 +1,6 @@
 import { check, type Update } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
-import { showInfo, showSuccess, showError } from "$lib/state/state.svelte";
+import { showInfo, showSuccess, showError, showErrorParsed } from "$lib/state/state.svelte";
 import { launcherStore } from "$lib/state/state.svelte";
 
 let cachedUpdate: Update | null = null;
@@ -28,7 +28,7 @@ export async function checkForUpdates(silent = false) {
 			"Podés descargarlo desde Ajustes.",
 		);
 	} catch (err) {
-		if (!silent) showError("Error al buscar updates", `${err}`);
+		if (!silent) showErrorParsed(err);
 	}
 }
 
@@ -72,7 +72,7 @@ export async function downloadUpdate() {
 			"La actualización está lista para instalar.",
 		);
 	} catch (err) {
-		showError("Error de descarga", `${err}`);
+		showErrorParsed(err);
 		launcherStore.updateProgress = 0;
 	}
 }
@@ -90,7 +90,7 @@ export async function installUpdate() {
 		await cachedUpdate.install();
 		await relaunch();
 	} catch (err) {
-		showError("Error al instalar", `${err}`);
+		showErrorParsed(err);
 	}
 }
 

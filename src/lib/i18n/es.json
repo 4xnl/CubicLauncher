@@ -85,6 +85,7 @@
 		"tools": "Herramientas",
 		"downloading": "descargando",
 		"completed": "completadas",
+		"failed": "error",
 		"noDownloads": "Sin descargas",
 		"noDownloadDesc": "Las versiones descargadas aparecerán aquí",
 		"modals": {
@@ -275,7 +276,8 @@
 			"releases": "Lanzamientos",
 			"snapshots": "Snapshots",
 			"alphas": "Alphas",
-			"fabric": "Fabric"
+			"fabric": "Fabric",
+			"forge": "Forge"
 		},
 		"downloading": "Descargando..."
 	},
@@ -326,5 +328,41 @@
 			"title": "Configuración de Java",
 			"desc": "Aquí puedes gestionar las versiones de Java 8, 17, 21 y 25. Puedes instalar Java automáticamente desde el launcher o usar una instalación externa. También puedes configurar argumentos JVM y variables de entorno."
 		}
+	},
+	"errors": {
+		"title": "Error",
+		"INST_NOT_FOUND": "Instancia no encontrada",
+		"INST_MOD_NOT_FOUND": "Mod no encontrado",
+		"INST_ALREADY_STARTED": "La instancia ya está en ejecución",
+		"INST_EXISTS": "La instancia '{name}' ya existe",
+		"INST_LOG_NOT_FOUND": "Archivo de registro no encontrado",
+		"INST_FILENAME_PARSE": "Error al procesar nombre de archivo",
+		"INST_NAME_INVALID": "Nombre de instancia inválido: {error}",
+		"INST_SRC_INVALID": "Ruta de origen inválida",
+		"INST_JRE_MISSING": "Java {version} no está instalado. Instálalo en Ajustes > Java.",
+		"FS_READ_DIR": "No se pudo leer directorio '{path}': {error}",
+		"FS_READ_FILE": "No se pudo leer archivo '{path}': {error}",
+		"FS_CREATE_DIR": "No se pudo crear directorio '{path}': {error}",
+		"FS_WRITE_FILE": "No se pudo escribir archivo '{path}': {error}",
+		"FS_COPY": "No se pudo copiar '{from}' a '{to}': {error}",
+		"FS_RENAME": "No se pudo renombrar '{from}' a '{to}': {error}",
+		"FS_REMOVE": "No se pudo eliminar '{path}': {error}",
+		"FS_NOT_FOUND": "Archivo no encontrado: '{path}'",
+		"FS_INVALID_PATH": "Ruta inválida: '{path}'",
+		"CORE_LOCK": "Error de bloqueo interno: {error}",
+		"CORE_SERIALIZE": "Error al serializar configuración: {error}",
+		"CORE_SAVE": "No se pudo guardar configuración: {error}",
+		"CORE_LOAD": "No se pudo cargar configuración: {error}",
+		"CORE_THREAD": "Error en hilo: {error}",
+		"DL_CANT_FETCH": "Error de red: {error}",
+		"DL_CANT_READ": "Error al leer respuesta: {error}",
+		"DL_JSON_PARSE": "Error al parsear JSON: {error}",
+		"DL_NO_FABRIC": "No se encontró loader de Fabric para esta versión",
+		"AUTH_DEVICE_CODE": "Error al obtener device code: {error}",
+		"AUTH_FAILED": "Error de autenticación con Microsoft: {error}",
+		"AUTH_TOKENS_SAVE": "Error al guardar tokens: {error}",
+		"AUTH_TOKENS_DEL": "Error al eliminar tokens: {error}",
+		"AUTH_BLOCKED": "Error interno: {error}",
+		"GENERIC": "Ocurrió un error inesperado: {error}"
 	}
 }

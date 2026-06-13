@@ -32,3 +32,29 @@ pub enum InstanceError {
     #[error(transparent)]
     Fs(#[from] crate::core::errors::fs::FsError),
 }
+
+impl InstanceError {
+    pub fn code(&self) -> &'static str {
+        match self {
+            Self::NotFound => "INST_NOT_FOUND",
+            Self::ModNotFound => "INST_MOD_NOT_FOUND",
+            Self::AlreadyStarted => "INST_ALREADY_STARTED",
+            Self::AlreadyExists => "INST_EXISTS",
+            Self::LogNotFound => "INST_LOG_NOT_FOUND",
+            Self::FilenameParse => "INST_FILENAME_PARSE",
+            Self::InstNameParse(_) => "INST_NAME_INVALID",
+            Self::InvalidSourcePath => "INST_SRC_INVALID",
+            Self::JreNotFound(_) => "INST_JRE_MISSING",
+            Self::Fs(e) => e.code(),
+        }
+    }
+
+    pub fn params(&self) -> Vec<(&'static str, String)> {
+        match self {
+            Self::InstNameParse(s) => vec![("error", s.clone())],
+            Self::JreNotFound(v) => vec![("version", v.clone())],
+            Self::Fs(e) => e.params(),
+            _ => vec![],
+        }
+    }
+}

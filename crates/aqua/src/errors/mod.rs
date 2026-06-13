@@ -1,7 +1,7 @@
 use thiserror::Error;
 
 #[derive(Error, Debug)]
-pub enum ProtonError {
+pub enum AquaError {
     #[error("HTTP request failed: {0}")]
     RequestError(#[from] reqwest::Error),
 
@@ -38,27 +38,49 @@ pub enum ProtonError {
     #[error("Download cancelled")]
     Cancelled,
 
+    #[error("Forge installer download failed: {0}")]
+    ForgeInstallerDownload(String),
+
+    #[error("Forge installer extraction failed: {0}")]
+    ForgeExtract(String),
+
+    #[error("Forge profile parse failed: {0}")]
+    ForgeProfileParse(String),
+
+    #[error("Forge processor '{processor}' failed: {detail}")]
+    ForgeProcessor {
+        processor: String,
+        detail: String,
+    },
+
+    #[error("Forge output verification failed: {file} (expected {expected}, got {actual})")]
+    ForgeOutputVerification {
+        file: String,
+        expected: String,
+        actual: String,
+    },
+
     #[error("{0}")]
     Other(String),
 }
 
-impl From<Box<dyn std::error::Error + Send + Sync>> for ProtonError {
+impl From<Box<dyn std::error::Error + Send + Sync>> for AquaError {
     fn from(err: Box<dyn std::error::Error + Send + Sync>) -> Self {
-        ProtonError::Other(err.to_string())
+        AquaError::Other(err.to_string())
     }
 }
 
-impl From<zellkern::Error> for ProtonError {
+impl From<zellkern::Error> for AquaError {
     fn from(err: zellkern::Error) -> Self {
         match err {
-            zellkern::Error::Io(e) => ProtonError::IoError(e),
-            zellkern::Error::Json(e) => ProtonError::JsonError(e),
-            zellkern::Error::MainClassNotFound => ProtonError::MainClassNotFound,
-            zellkern::Error::EmptyClasspath => ProtonError::EmptyClasspath,
-            zellkern::Error::JavaNotFound(p) => ProtonError::JavaNotFound(p),
-            zellkern::Error::MissingFile(p) => ProtonError::MissingFile(p),
-            zellkern::Error::VersionLoad(v) => ProtonError::VersionNotFound(v),
-            zellkern::Error::Custom(s) => ProtonError::Other(s),
+            zellkern::Error::Io(e) => AquaError::IoError(e),
+            zellkern::Error::Json(e) => AquaError::JsonError(e),
+            zellkern::Error::MainClassNotFound => AquaError::MainClassNotFound,
+            zellkern::Error::EmptyClasspath => AquaError::EmptyClasspath,
+            zellkern::Error::JavaNotFound(p) => AquaError::JavaNotFound(p),
+            zellkern::Error::MissingFile(p) => AquaError::MissingFile(p),
+            zellkern::Error::VersionLoad(v) => AquaError::VersionNotFound(v),
+            zellkern::Error::Custom(s) => AquaError::Other(s),
         }
     }
 }

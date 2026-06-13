@@ -77,7 +77,7 @@ fn get_native_subdir(lib_name: &str) -> &'static str {
     }
 }
 
-fn extract_jar(jar_path: &Path, dest_dir: &Path) -> Result<(), Error> {
+pub fn extract_jar(jar_path: &Path, dest_dir: &Path) -> Result<(), Error> {
     let file = fs::File::open(jar_path)?;
     let mut archive = zip::ZipArchive::new(file).map_err(|e| {
         std::io::Error::new(
@@ -129,7 +129,7 @@ fn extract_jar(jar_path: &Path, dest_dir: &Path) -> Result<(), Error> {
     Ok(())
 }
 
-fn is_native_file(name: &str) -> bool {
+pub fn is_native_file(name: &str) -> bool {
     let lower = name.to_lowercase();
     if lower.starts_with("meta-inf") || lower.ends_with('/') {
         return false;

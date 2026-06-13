@@ -240,8 +240,11 @@ impl Library {
         if self.native_artifact().is_some() {
             return true;
         }
-        if self.rules.is_some() && self.name.split(':').count() == 4 {
-            return true;
+        if self.rules.is_some() {
+            let parts: Vec<&str> = self.name.splitn(4, ':').collect();
+            if parts.len() == 4 && parts[3].starts_with("natives-") {
+                return true;
+            }
         }
         let path_str = self
             .downloads

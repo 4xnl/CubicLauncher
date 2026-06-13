@@ -1,5 +1,6 @@
 mod batch;
 mod fabric;
+mod forge;
 mod minecraft;
 
 use std::path::PathBuf;
@@ -13,11 +14,12 @@ use tokio::task::JoinHandle;
 
 pub use batch::{DownloadBatch, DownloadItemSpec, GenericBatch};
 pub use fabric::FabricBatch;
+pub use forge::{ForgeBatch, ForgeVersionInfo};
 pub use minecraft::MinecraftBatch;
 
 use crate::types::{DownloadProgress, DownloadProgressInfo, DownloadProgressType, NormalizedVersion};
 use crate::utilities::download_file;
-use crate::ProtonError;
+use crate::AquaError;
 
 const DEFAULT_MAX_HANDLES: usize = 2;
 const DEFAULT_DOWNLOADS_PER_HANDLE: usize = 128;
@@ -50,7 +52,7 @@ impl DownloadManager {
     }
 
     /// Minecraft-specific: resolve version from Mojang manifest and download everything.
-    pub async fn prepare(&self, version_id: &str) -> Result<DownloadHandle, ProtonError> {
+    pub async fn prepare(&self, version_id: &str) -> Result<DownloadHandle, AquaError> {
         let batch = MinecraftBatch::new(&self.game_path, version_id).await?;
         let name = batch.name();
         let total = batch.items().len();
@@ -77,7 +79,7 @@ impl DownloadManager {
     pub async fn prepare_batch(
         &self,
         batch: Box<dyn DownloadBatch + 'static>,
-    ) -> Result<DownloadHandle, ProtonError> {
+    ) -> Result<DownloadHandle, AquaError> {
         let name = batch.name();
         let total = batch.items().len();
 
@@ -108,7 +110,7 @@ struct DownloadInner {
     handle_sem: Arc<Semaphore>,
     download_sem: Arc<Semaphore>,
     cancel_flag: AtomicBool,
-    join_handle: Mutex<Option<JoinHandle<Result<(), ProtonError>>>>,
+    join_handle: Mutex<Option<JoinHandle<Result<(), AquaError>>>>,
     completed_items: Arc<AtomicUsize>,
     total_items: Arc<AtomicUsize>,
 }
@@ -144,7 +146,7 @@ impl DownloadHandle {
     pub async fn download_all(
         &self,
         progress_tx: Option<Sender<DownloadProgress>>,
-    ) -> Result<(), ProtonError> {
+    ) -> Result<(), AquaError> {
         self.start(progress_tx).await?;
         self.wait().await
     }
@@ -152,10 +154,10 @@ impl DownloadHandle {
     pub async fn start(
         &self,
         progress_tx: Option<Sender<DownloadProgress>>,
-    ) -> Result<(), ProtonError> {
+    ) -> Result<(), AquaError> {
         let mut slot = self.inner.join_handle.lock().await;
         if slot.is_some() {
-            return Err(ProtonError::Other(
+            return Err(AquaError::Other(
                 "Download already in progress or completed".into(),
             ));
         }
@@ -170,11 +172,11 @@ impl DownloadHandle {
         Ok(())
     }
 
-    pub async fn wait(&self) -> Result<(), ProtonError> {
+    pub async fn wait(&self) -> Result<(), AquaError> {
         let handle = self.inner.join_handle.lock().await.take();
         match handle {
             Some(h) => h.await?,
-            None => Err(ProtonError::Other("Download not started".into())),
+            None => Err(AquaError::Other("Download not started".into())),
         }
     }
 }
@@ -184,7 +186,7 @@ impl DownloadHandle {
 async fn run_download(
     inner: Arc<DownloadInner>,
     progress_tx: Option<Sender<DownloadProgress>>,
-) -> Result<(), ProtonError> {
+) -> Result<(), AquaError> {
     inner.batch.prepare().await?;
 
     let items = inner.batch.items();
@@ -197,7 +199,7 @@ async fn run_download(
 
     for item in items {
         if inner.cancel_flag.load(Ordering::Relaxed) {
-            return Err(ProtonError::Cancelled);
+            return Err(AquaError::Cancelled);
         }
 
         let s = Arc::clone(&sem);
@@ -226,7 +228,7 @@ async fn run_download(
                 label,
             )
             .await;
-            Ok::<_, ProtonError>(())
+            Ok::<_, AquaError>(())
         }));
     }
 
@@ -234,7 +236,7 @@ async fn run_download(
         res??;
     }
 
-    inner.batch.finalize().await?;
+    inner.batch.finalize(progress_tx).await?;
 
     Ok(())
 }

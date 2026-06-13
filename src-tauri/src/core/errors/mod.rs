@@ -25,18 +25,78 @@ pub enum AppError {
 
     #[error(transparent)]
     Download(#[from] DownloadError),
+
     #[error(transparent)]
     Fs(#[from] FsError),
 }
 
-impl From<AppError> for String {
-    fn from(e: AppError) -> String {
-        e.to_string()
+fn json_error(code: &str, params: &[(&str, String)]) -> String {
+    if params.is_empty() {
+        return format!(r#"{{"code":"{}"}}"#, code);
+    }
+    let inner: Vec<String> = params
+        .iter()
+        .map(|(k, v)| {
+            format!(
+                r#""{}":"{}""#,
+                k,
+                v.replace('\\', "\\\\").replace('"', "\\\"")
+            )
+        })
+        .collect();
+    format!(
+        r#"{{"code":"{}","params":{{{}}}}}"#,
+        code,
+        inner.join(",")
+    )
+}
+
+impl AppError {
+    pub fn to_json(&self) -> String {
+        let (code, params) = match self {
+            Self::Instance(e) => (e.code(), e.params()),
+            Self::CoreError(e) => (e.code(), e.params()),
+            Self::Auth(e) => (e.code(), e.params()),
+            Self::Download(e) => (e.code(), e.params()),
+            Self::Fs(e) => (e.code(), e.params()),
+        };
+        json_error(code, &params)
     }
 }
+
+impl From<AppError> for String {
+    fn from(e: AppError) -> String {
+        e.to_json()
+    }
+}
+
+impl From<InstanceError> for String {
+    fn from(e: InstanceError) -> String {
+        json_error(e.code(), &e.params())
+    }
+}
+
 impl From<CoreError> for String {
     fn from(e: CoreError) -> String {
-        e.to_string()
+        json_error(e.code(), &e.params())
+    }
+}
+
+impl From<AuthError> for String {
+    fn from(e: AuthError) -> String {
+        json_error(e.code(), &e.params())
+    }
+}
+
+impl From<DownloadError> for String {
+    fn from(e: DownloadError) -> String {
+        json_error(e.code(), &e.params())
+    }
+}
+
+impl From<FsError> for String {
+    fn from(e: FsError) -> String {
+        json_error(e.code(), &e.params())
     }
 }
 
@@ -44,82 +104,57 @@ impl From<CoreError> for String {
 mod tests {
     use super::*;
 
-    /// `InstanceError::NotFound` debe convertirse a `AppError::Instance(InstanceError::NotFound)`.
     #[test]
-    fn test_instance_error_into_app_error() {
-        let err = AppError::from(InstanceError::NotFound);
-        assert!(matches!(err, AppError::Instance(InstanceError::NotFound)));
-    }
-
-    /// `FsError` debe convertirse a `AppError::Fs(_)`.
-    #[test]
-    fn test_fs_error_into_app_error() {
-        let fs_err = FsError::NotFound("/tmp/foo".into());
-        let err = AppError::from(fs_err);
-        assert!(matches!(err, AppError::Fs(_)));
-    }
-
-    /// `CoreError` debe convertirse a `AppError::CoreError(_)`.
-    #[test]
-    fn test_core_error_into_app_error() {
-        let err = AppError::from(CoreError::LockPoisoned("test".into()));
-        assert!(matches!(err, AppError::CoreError(_)));
-    }
-
-    /// `AuthError` debe convertirse a `AppError::Auth(_)`.
-    #[test]
-    fn test_auth_error_into_app_error() {
-        let err = AppError::from(AuthError::AuthFailed("fail".into()));
-        assert!(matches!(err, AppError::Auth(_)));
-    }
-
-    /// `DownloadError` debe convertirse a `AppError::Download(_)`.
-    #[test]
-    fn test_download_error_into_app_error() {
-        let err = AppError::from(DownloadError::NoFabricLoader);
-        assert!(matches!(err, AppError::Download(_)));
-    }
-
-    /// `CoreError::LockPoisoned("oh no")` debe convertirse al string
-    /// `"Lock envenenado: oh no"`.
-    #[test]
-    fn test_core_error_into_string() {
-        let s: String = CoreError::LockPoisoned("oh no".into()).into();
-        assert_eq!(s, "Lock envenenado: oh no");
-    }
-
-    /// `AppError::Instance(InstanceError::NotFound)` debe convertirse al string
-    /// `"Instancia no encontrada"` para mostrar al usuario.
-    #[test]
-    fn test_app_error_into_string() {
+    fn test_app_error_not_found() {
         let s: String = AppError::Instance(InstanceError::NotFound).into();
-        assert_eq!(s, "Instancia no encontrada");
+        assert_eq!(s, r#"{"code":"INST_NOT_FOUND"}"#);
     }
 
-    /// `AppError::Fs(FsError::NotFound("/x"))` debe convertirse al string
-    /// `"Archivo no encontrado: '/x'"` incluyendo el path.
     #[test]
-    fn test_app_error_fs_into_string() {
-        let s: String = AppError::from(FsError::NotFound("/x".into())).into();
-        assert_eq!(s, "Archivo no encontrado: '/x'");
+    fn test_app_error_with_params() {
+        let s: String = AppError::Instance(InstanceError::JreNotFound("17".into())).into();
+        assert_eq!(s, r#"{"code":"INST_JRE_MISSING","params":{"version":"17"}}"#);
     }
 
-    /// `AppError::Auth(AuthError::SaveTokensFailed("oops"))` debe convertirse al string
-    /// `"Error al guardar los tokens: oops"`.
     #[test]
-    fn test_app_error_auth_into_string() {
-        let s: String = AppError::from(AuthError::SaveTokensFailed("oops".into())).into();
-        assert_eq!(s, "Error al guardar los tokens: oops");
+    fn test_fs_error() {
+        let s: String = AppError::Fs(FsError::NotFound("/x".into())).into();
+        assert_eq!(s, r#"{"code":"FS_NOT_FOUND","params":{"path":"/x"}}"#);
     }
 
-    /// `AppError::Download(DownloadError::NoFabricLoader)` debe convertirse al string
-    /// `"No se encontró ningún loader de Fabric para esta versión"`.
     #[test]
-    fn test_app_error_download_into_string() {
-        let s: String = AppError::from(DownloadError::NoFabricLoader).into();
-        assert_eq!(
-            s,
-            "No se encontró ningún loader de Fabric para esta versión"
-        );
+    fn test_auth_error() {
+        let s: String = AppError::Auth(AuthError::SaveTokensFailed("oops".into())).into();
+        assert_eq!(s, r#"{"code":"AUTH_TOKENS_SAVE","params":{"error":"oops"}}"#);
+    }
+
+    #[test]
+    fn test_download_error() {
+        let s: String = AppError::Download(DownloadError::NoFabricLoader).into();
+        assert_eq!(s, r#"{"code":"DL_NO_FABRIC"}"#);
+    }
+
+    #[test]
+    fn test_core_error() {
+        let s: String = CoreError::LockPoisoned("oh no".into()).into();
+        assert_eq!(s, r#"{"code":"CORE_LOCK","params":{"error":"oh no"}}"#);
+    }
+
+    #[test]
+    fn test_instance_error_into_string() {
+        let s: String = InstanceError::NotFound.into();
+        assert_eq!(s, r#"{"code":"INST_NOT_FOUND"}"#);
+    }
+
+    #[test]
+    fn test_fs_nested_in_instance() {
+        let s: String = AppError::Instance(InstanceError::Fs(FsError::NotFound("/tmp".into()))).into();
+        assert_eq!(s, r#"{"code":"FS_NOT_FOUND","params":{"path":"/tmp"}}"#);
+    }
+
+    #[test]
+    fn test_json_escaping() {
+        let s: String = InstanceError::InstNameParse(r#"bad"name"#.into()).into();
+        assert!(s.contains(r#"bad\"name"#));
     }
 }

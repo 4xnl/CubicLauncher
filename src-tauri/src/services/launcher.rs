@@ -10,6 +10,7 @@ use crate::services::instance_manager::{
 use crate::services::java_manager::JavaManager;
 use launchwerk::auth::{AccountType, MinecraftUser, microsoft::MicrosoftAuth};
 use launchwerk::models::VersionManifest;
+use zellkern::Loader;
 use launchwerk::{LaunchConfig, Launchwerk};
 use std::sync::{Arc, OnceLock};
 use tauri::Emitter;
@@ -93,8 +94,48 @@ impl Launcher {
             .map_err(|e| DownloadError::ParseJson(e.to_string()))?;
         let mut user = SettingsManager::read().get_user();
 
+        // Resolve java version through inheritsFrom chain (Forge version.json may omit it)
+        let mut java_version_req = if manifest.java_version.is_some() {
+            manifest.java_version.clone()
+        } else {
+            manifest.inherits_from.as_ref().and_then(|parent_id| {
+                let parent_path =
+                    shared_dir.join(format!("versions/{parent_id}/{parent_id}.json"));
+                VersionManifest::from_file(parent_path)
+                    .ok()
+                    .and_then(|p| p.java_version)
+            })
+        };
+
+        // Forge/NeoForge ModLauncher requires Java 16+; bump if manifest says < 16.
+        // But Forge < 36.2.26 bundles ModLauncher 8.0.9 which has a broken
+        // ManifestEntryVerifier constructor — only bump for >= 36.2.26.
+        let loader = Loader::from_version_id(&manifest.id_raw);
+        if let Some(ref mut jv) = java_version_req
+            && matches!(loader, Loader::Forge(_) | Loader::NeoForge(_))
+            && jv.major_version < 16
+        {
+            let should_bump = match &loader {
+                Loader::Forge(id) => is_forge_version_safe(id),
+                Loader::NeoForge(_) => true,
+                _ => false,
+            };
+            if should_bump {
+                info!(
+                    "Forge/NeoForge detected (Java {} requested), upgrading to Java 17",
+                    jv.major_version
+                );
+                jv.major_version = 17;
+            } else {
+                info!(
+                    "Old Forge detected (Java {} requested), keeping Java 8 (ModLauncher < 8.1 incompatible with Java 17+)",
+                    jv.major_version
+                );
+            }
+        }
+
         let (java_version, java_path) =
-            resolve_java_path(&settings_m, manifest.java_version.as_ref());
+            resolve_java_path(&settings_m, java_version_req.as_ref());
 
         if !java_path.exists() {
             handle.set_status(InstanceStatus::Error(
@@ -128,6 +169,16 @@ impl Launcher {
             if !k.is_empty() {
                 builder = builder.env(k.as_str(), v);
             }
+        }
+
+        let parsed_jvm_args: Vec<String> = settings_m
+            .jvm_args
+            .split_whitespace()
+            .filter(|s| !s.is_empty())
+            .map(String::from)
+            .collect();
+        if !parsed_jvm_args.is_empty() {
+            builder = builder.extra_jvm_args(parsed_jvm_args);
         }
 
         let options = builder.build();
@@ -255,6 +306,25 @@ fn spawn_io_forwarding(
             }
         }
     });
+}
+
+/// Returns true if the Forge version ID indicates a version >= 36.2.26
+/// (which bundles ModLauncher 8.1.3+ with the fixed ManifestEntryVerifier).
+fn is_forge_version_safe(version_id: &str) -> bool {
+    let Some(idx) = version_id.rfind("-forge-") else {
+        return true;
+    };
+    let forge_ver = &version_id[idx + 7..];
+    let parts: Vec<u32> = forge_ver
+        .split('.')
+        .filter_map(|p| p.parse().ok())
+        .collect();
+    match parts.as_slice() {
+        [major, minor, patch, ..] => {
+            (*major, *minor, *patch) > (36, 2, 25)
+        }
+        _ => true,
+    }
 }
 
 fn resolve_java_path(

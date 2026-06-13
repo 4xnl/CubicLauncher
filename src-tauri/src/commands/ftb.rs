@@ -1,4 +1,4 @@
-use crate::core::{AppEvent, InstanceError, emit};
+use crate::core::{AppEvent, InstanceError, emit, http_client::USER_AGENT};
 use crate::services::{DownloadQueue, InstanceManager};
 use serde::{Deserialize, Serialize};
 use std::io::Read;
@@ -124,16 +124,7 @@ pub async fn install_curse_manifest(
 
     let (loader, loader_version) = parse_loader(&manifest);
 
-    let version_id = if let Some(ref lv) = loader_version {
-        match loader.as_deref() {
-            Some("fabric") => format!("fabric-loader-{}-{}", lv, mc_version),
-            Some("forge") => mc_version.to_string(),
-            Some("neoforge") => mc_version.to_string(),
-            _ => mc_version.clone(),
-        }
-    } else {
-        mc_version.clone()
-    };
+    let version_id = build_version_id(&loader, &loader_version, &manifest.minecraft.version);
 
     let manager = InstanceManager::get();
     let handle = manager
@@ -147,7 +138,7 @@ pub async fn install_curse_manifest(
     let instance_dir = handle.get_instance_dir().await;
 
     let client = reqwest::Client::builder()
-        .user_agent("CubicLauncher/27.0.1")
+        .user_agent(USER_AGENT)
         .build()
         .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
 
@@ -156,39 +147,7 @@ pub async fn install_curse_manifest(
         .await
         .map_err(|e| format!("Failed to create mods directory: {}", e))?;
 
-    for file_entry in &file_urls {
-        let dest = mods_dir.join(&file_entry.filename);
-        info!("Downloading {} -> {:?}", file_entry.url, dest);
-
-        let response = client
-            .get(&file_entry.url)
-            .send()
-            .await
-            .map_err(|e| format!("Download failed for {}: {}", file_entry.filename, e))?;
-
-        if !response.status().is_success() {
-            return Err(format!(
-                "HTTP {} downloading {}",
-                response.status(),
-                file_entry.filename
-            ));
-        }
-
-        let mut file = tokio::fs::File::create(&dest)
-            .await
-            .map_err(|e| format!("Failed to create file {:?}: {}", dest, e))?;
-        let mut stream = response.bytes_stream();
-        use futures::StreamExt;
-        while let Some(chunk) = stream.next().await {
-            let chunk = chunk.map_err(|e| format!("Stream error: {}", e))?;
-            file.write_all(&chunk)
-                .await
-                .map_err(|e| format!("Write error: {}", e))?;
-        }
-        file.flush()
-            .await
-            .map_err(|e| format!("Flush error: {}", e))?;
-    }
+    download_mod_files(&client, &file_urls, &mods_dir).await?;
 
     extract_overrides(Path::new(&path), &instance_dir).await?;
 
@@ -234,6 +193,63 @@ fn read_curse_manifest(path: &Path) -> Result<CurseManifest, String> {
     Ok(manifest)
 }
 
+fn build_version_id(
+    loader: &Option<String>,
+    loader_version: &Option<String>,
+    minecraft_version: &str,
+) -> String {
+    if let Some(lv) = loader_version {
+        match loader.as_deref() {
+            Some("fabric") => format!("fabric-loader-{}-{}", lv, minecraft_version),
+            Some("forge") | Some("neoforge") => minecraft_version.to_string(),
+            _ => minecraft_version.to_string(),
+        }
+    } else {
+        minecraft_version.to_string()
+    }
+}
+
+async fn download_mod_files(
+    client: &reqwest::Client,
+    file_urls: &[CurseFileUrl],
+    mods_dir: &Path,
+) -> Result<(), String> {
+    use futures::StreamExt;
+    for file_entry in file_urls {
+        let dest = mods_dir.join(&file_entry.filename);
+        info!("Downloading {} -> {:?}", file_entry.url, dest);
+
+        let response = client
+            .get(&file_entry.url)
+            .send()
+            .await
+            .map_err(|e| format!("Download failed for {}: {}", file_entry.filename, e))?;
+
+        if !response.status().is_success() {
+            return Err(format!(
+                "HTTP {} downloading {}",
+                response.status(),
+                file_entry.filename
+            ));
+        }
+
+        let mut file = tokio::fs::File::create(&dest)
+            .await
+            .map_err(|e| format!("Failed to create file {:?}: {}", dest, e))?;
+        let mut stream = response.bytes_stream();
+        while let Some(chunk) = stream.next().await {
+            let chunk = chunk.map_err(|e| format!("Stream error: {}", e))?;
+            file.write_all(&chunk)
+                .await
+                .map_err(|e| format!("Write error: {}", e))?;
+        }
+        file.flush()
+            .await
+            .map_err(|e| format!("Flush error: {}", e))?;
+    }
+    Ok(())
+}
+
 fn parse_loader(manifest: &CurseManifest) -> (Option<String>, Option<String>) {
     for ml in &manifest.minecraft.mod_loaders {
         let parts: Vec<&str> = ml.id.split('-').collect();
@@ -271,16 +287,7 @@ pub async fn install_ftb_modpack(
         name, version, instance_name
     );
 
-    let version_id = if let Some(ref lv) = loader_version {
-        match loader.as_deref() {
-            Some("fabric") => format!("fabric-loader-{}-{}", lv, minecraft_version),
-            Some("forge") => minecraft_version.to_string(),
-            Some("neoforge") => minecraft_version.to_string(),
-            _ => minecraft_version.clone(),
-        }
-    } else {
-        minecraft_version.clone()
-    };
+    let version_id = build_version_id(&loader, &loader_version, &minecraft_version);
 
     let manager = InstanceManager::get();
     let handle = manager
@@ -294,7 +301,7 @@ pub async fn install_ftb_modpack(
     let instance_dir = handle.get_instance_dir().await;
 
     let client = reqwest::Client::builder()
-        .user_agent("CubicLauncher/27.0.1")
+        .user_agent(USER_AGENT)
         .build()
         .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
 
@@ -303,39 +310,7 @@ pub async fn install_ftb_modpack(
         .await
         .map_err(|e| format!("Failed to create mods directory: {}", e))?;
 
-    for file_entry in &file_urls {
-        let dest = mods_dir.join(&file_entry.filename);
-        info!("Downloading {} -> {:?}", file_entry.url, dest);
-
-        let response = client
-            .get(&file_entry.url)
-            .send()
-            .await
-            .map_err(|e| format!("Download failed for {}: {}", file_entry.filename, e))?;
-
-        if !response.status().is_success() {
-            return Err(format!(
-                "HTTP {} downloading {}",
-                response.status(),
-                file_entry.filename
-            ));
-        }
-
-        let mut file = tokio::fs::File::create(&dest)
-            .await
-            .map_err(|e| format!("Failed to create file {:?}: {}", dest, e))?;
-        let mut stream = response.bytes_stream();
-        use futures::StreamExt;
-        while let Some(chunk) = stream.next().await {
-            let chunk = chunk.map_err(|e| format!("Stream error: {}", e))?;
-            file.write_all(&chunk)
-                .await
-                .map_err(|e| format!("Write error: {}", e))?;
-        }
-        file.flush()
-            .await
-            .map_err(|e| format!("Flush error: {}", e))?;
-    }
+    download_mod_files(&client, &file_urls, &mods_dir).await?;
 
     DownloadQueue::get().enqueue(version_id.clone()).await;
 

@@ -6,10 +6,10 @@ pub(crate) mod types;
 pub(crate) mod utilities;
 
 pub use downloaders::{
-    DownloadBatch, DownloadHandle, DownloadItemSpec, DownloadManager, FabricBatch, GenericBatch,
-    MinecraftBatch,
+    DownloadBatch, DownloadHandle, DownloadItemSpec, DownloadManager, FabricBatch, ForgeBatch,
+    ForgeVersionInfo, GenericBatch, MinecraftBatch,
 };
-pub use errors::ProtonError;
+pub use errors::AquaError;
 pub use jre::{JrePackage, JreStatus, ZuluApi, ZuluPackage};
 pub use manifest::resolve_version_data;
 pub use types::*;

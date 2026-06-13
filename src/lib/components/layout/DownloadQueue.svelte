@@ -22,6 +22,7 @@
 		activeType: SegKey | null;
 		segs: Record<SegKey, SegProg>;
 		done: boolean;
+		error: string | null;
 	}
 
 	function emptySegs(): Record<SegKey, SegProg> {
@@ -57,6 +58,7 @@
 						activeType: null,
 						segs: emptySegs(),
 						done: item.status === "done",
+						error: null,
 					});
 				}
 			}
@@ -76,6 +78,7 @@
 							activeType: null,
 							segs: emptySegs(),
 							done: false,
+							error: null,
 						});
 						open = true;
 					}
@@ -88,6 +91,7 @@
 						activeType: null,
 						segs: emptySegs(),
 						done: false,
+						error: null,
 					};
 					const key = SEGS.includes(d_type as SegKey)
 						? (d_type as SegKey)
@@ -117,6 +121,30 @@
 					setTimeout(() => {
 						downloads.delete(version);
 					}, 4000);
+					break;
+				}
+				case "DError": {
+					const { version, message } = p.data;
+					const item = downloads.get(version);
+					if (item) {
+						downloads.set(version, {
+							...item,
+							done: true,
+							activeType: null,
+							error: message,
+						});
+					} else {
+						downloads.set(version, {
+							version,
+							activeType: null,
+							segs: emptySegs(),
+							done: true,
+							error: message,
+						});
+					}
+					setTimeout(() => {
+						downloads.delete(version);
+					}, 8000);
 					break;
 				}
 			}
@@ -155,25 +183,35 @@
 			{#if downloads.size === 0}
 				<div class="sd-empty">{t("sidebar.noDownloadDesc")}</div>
 			{:else}
-				{#each [...downloads.values()] as item (item.version)}
-					{@const overall = pct(item.segs)}
-					<div class="sd-item" class:done={item.done}>
-						<div class="sd-item-header">
-							<span class="sd-item-left">
-								{#if item.done}
-									<CheckIcon size={8} />
-								{:else}
-									<span class="sd-spinner-sm"></span>
-								{/if}
-								<span class="sd-version">{item.version}</span>
-							</span>
+		{#each [...downloads.values()] as item (item.version)}
+				{@const overall = pct(item.segs)}
+				<div class="sd-item" class:done={item.done} class:error={item.error}>
+					<div class="sd-item-header">
+						<span class="sd-item-left">
+							{#if item.error}
+								<span class="sd-error-icon">!</span>
+							{:else if item.done}
+								<CheckIcon size={8} />
+							{:else}
+								<span class="sd-spinner-sm"></span>
+							{/if}
+							<span class="sd-version">{item.version}</span>
+						</span>
+						{#if item.error}
+							<span class="sd-pct error">{t("sidebar.failed")}</span>
+						{:else}
 							<span class="sd-pct" class:done={item.done}>{overall}%</span>
-						</div>
+						{/if}
+					</div>
+					{#if item.error}
+						<div class="sd-error-msg">{item.error}</div>
+					{:else}
 						<div class="sd-progress-track">
 							<div class="sd-progress-fill" class:done={item.done} style:width="{overall}%"></div>
 						</div>
-					</div>
-				{/each}
+					{/if}
+				</div>
+			{/each}
 			{/if}
 		</div>
 	{/if}
@@ -311,6 +349,36 @@
 
 	.sd-pct.done {
 		color: var(--color-success);
+	}
+
+	.sd-pct.error {
+		color: var(--color-error);
+	}
+
+	.sd-error-icon {
+		width: 8px;
+		height: 8px;
+		background: var(--color-error);
+		color: white;
+		border-radius: 50%;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		font-size: 6px;
+		font-weight: 900;
+		line-height: 1;
+		flex-shrink: 0;
+	}
+
+	.sd-error-msg {
+		font-size: 0.65rem;
+		color: var(--color-error);
+		word-break: break-word;
+		line-height: 1.3;
+	}
+
+	.sd-item.error {
+		background: rgba(220, 38, 38, 0.05);
 	}
 
 	.sd-progress-track {

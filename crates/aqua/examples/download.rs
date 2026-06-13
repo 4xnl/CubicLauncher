@@ -25,6 +25,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 DownloadProgressType::Native => "NATIVE",
                 DownloadProgressType::Verifying => "VERIFY",
                 DownloadProgressType::Generic => "GENERIC",
+                DownloadProgressType::Processing => "PROC",
             };
             println!(
                 "[{}/{}] [{label:6}] {}",

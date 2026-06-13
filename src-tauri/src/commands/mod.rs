@@ -1,6 +1,7 @@
 pub mod auth;
 pub mod discord;
 pub mod download;
+pub mod forge;
 pub mod ftb;
 pub mod instance;
 pub mod java;

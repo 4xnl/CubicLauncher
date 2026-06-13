@@ -7,12 +7,16 @@
 		getInstalledMcVersions,
 		getFabricVersions,
 		downloadFabric,
+		getForgeVersions,
+		downloadForge,
 		refreshAvailableVersions,
+		refreshForgeVersions,
 		getDownloadQueue,
 	} from "$lib/api/cubicApi";
 	import type {
 		MinecraftVersion,
 		FabricGameVersion,
+		ForgeGameVersion,
 		AppEvent,
 	} from "$lib/types/types";
 	import { listen } from "@tauri-apps/api/event";
@@ -35,8 +39,10 @@
 	let loading = $state(true);
 	let manifest = $state<MinecraftVersion[] | null>(null);
 	let fabricManifest = $state<FabricGameVersion[]>([]);
+	let forgeManifest = $state<ForgeGameVersion[]>([]);
 	let installedVanilla = $state(new Set<string>());
 	let installedFabric = $state(new Set<string>());
+	let installedForge = $state(new Set<string>());
 	let downloadingVersions = new SvelteSet<string>();
 	let filter = $state("release");
 	let search = $state("");
@@ -46,7 +52,14 @@
 
 	let loadingMojang = $state(false);
 	let loadingFabric = $state(false);
+	let loadingForge = $state(false);
 	let refreshing = $state(false);
+
+	function refreshCurrentSource() {
+		if (filter === "fabric") refreshFabric();
+		else if (filter === "forge") refreshForge();
+		else refreshMojang();
+	}
 
 	async function refreshMojang() {
 		refreshing = true;
@@ -57,6 +70,12 @@
 	async function refreshFabric() {
 		refreshing = true;
 		fabricManifest = await getFabricVersions();
+		refreshing = false;
+	}
+
+	async function refreshForge() {
+		refreshing = true;
+		forgeManifest = await refreshForgeVersions();
 		refreshing = false;
 	}
 
@@ -74,11 +93,19 @@
 		loadingFabric = false;
 	}
 
+	async function loadForge() {
+		if (forgeManifest.length > 0 || loadingForge) return;
+		loadingForge = true;
+		forgeManifest = await getForgeVersions();
+		loadingForge = false;
+	}
+
 	onMount(() => {
 		getInstalledVersions().then((raw) => {
-			const { vanilla, fabric } = getInstalledMcVersions(raw);
+			const { vanilla, fabric, forge } = getInstalledMcVersions(raw);
 			installedVanilla = vanilla;
 			installedFabric = fabric;
+			installedForge = forge;
 			loading = false;
 		});
 
@@ -97,10 +124,13 @@
 			} else if (p.type === "DFinish") {
 				downloadingVersions.delete(p.data.version);
 				getInstalledVersions().then((raw) => {
-					const { vanilla, fabric } = getInstalledMcVersions(raw);
+					const { vanilla, fabric, forge } = getInstalledMcVersions(raw);
 					installedVanilla = vanilla;
 					installedFabric = fabric;
+					installedForge = forge;
 				});
+			} else if (p.type === "DError") {
+				downloadingVersions.delete(p.data.version);
 			}
 		});
 
@@ -110,18 +140,31 @@
 	});
 
 	$effect(() => {
-		if (filter === "fabric") {
-			loadFabric();
-		} else {
-			loadMojang();
-		}
+		if (filter === "fabric") loadFabric();
+		else if (filter === "forge") loadForge();
+		else loadMojang();
 	});
 
-	const isCurrentManifestLoading = $derived(
-		filter === "fabric" ? loadingFabric : loadingMojang,
-	);
+	const isCurrentManifestLoading = $derived.by(() => {
+		if (filter === "fabric") return loadingFabric;
+		if (filter === "forge") return loadingForge;
+		return loadingMojang;
+	});
 
 	const availableMajorVersions = $derived.by(() => {
+		if (filter === "forge") {
+			const versions = new SvelteSet<string>();
+			forgeManifest.forEach((v) => {
+				const match = v.game_version.match(/^1\.\d+/);
+				if (match) versions.add(match[0]);
+			});
+			return Array.from(versions).sort((a, b) => {
+				const aNum = parseInt(a.split(".")[1] || "0");
+				const bNum = parseInt(b.split(".")[1] || "0");
+				return bNum - aNum;
+			});
+		}
+
 		const source = filter === "fabric" ? fabricManifest : manifest;
 		if (!source) return [];
 		const versions = new SvelteSet<string>();
@@ -147,9 +190,31 @@
 		...availableMajorVersions.map((v) => ({ value: v, label: v })),
 	]);
 
-	const filteredVersions = $derived(
-		(filter === "fabric" ? fabricManifest : manifest)?.filter(
-			(v: MinecraftVersion | FabricGameVersion) => {
+	const filteredVersions = $derived.by(() => {
+		if (filter === "forge") {
+			return forgeManifest.filter((v) => {
+				const versionId = v.version_id;
+				const isInstalled = installedForge.has(versionId);
+
+				if (installStatusFilter === "installed" && !isInstalled) return false;
+				if (installStatusFilter === "not_installed" && isInstalled) return false;
+
+				if (
+					majorVersionFilter !== "all" &&
+					!v.game_version.startsWith(majorVersionFilter)
+				)
+					return false;
+
+				const matchesSearch = versionId
+					.toLowerCase()
+					.includes(search.toLowerCase());
+				return matchesSearch;
+			});
+		}
+
+		const source = filter === "fabric" ? fabricManifest : manifest;
+		return (
+			source?.filter((v: MinecraftVersion | FabricGameVersion) => {
 				const versionId =
 					filter === "fabric"
 						? (v as FabricGameVersion).version
@@ -202,15 +267,17 @@
 					.toLowerCase()
 					.includes(search.toLowerCase());
 				return matchesFilter && matchesSearch;
-			},
-		) || [],
-	);
+			}) || []
+		);
+	});
 
 	const displayVersions = $derived(
 		filteredVersions.map((v) => ({
-			id: (v as MinecraftVersion).id ?? (v as FabricGameVersion).version,
+			id: (v as MinecraftVersion).id ?? (v as FabricGameVersion).version ?? (v as ForgeGameVersion).version_id,
 			version:
-				(v as FabricGameVersion).version ?? (v as MinecraftVersion).id,
+				(v as FabricGameVersion).version ?? (v as MinecraftVersion).id ?? (v as ForgeGameVersion).version_id,
+			game_version: (v as ForgeGameVersion).game_version ?? "",
+			forge_version: (v as ForgeGameVersion).forge_version ?? "",
 			type: (v as MinecraftVersion).type ?? "",
 			stable: (v as FabricGameVersion).stable ?? false,
 			releaseTime: (v as MinecraftVersion).releaseTime ?? "",
@@ -226,17 +293,20 @@
 		}
 	});
 
-	async function handleDownload(versionId: string) {
+	async function handleDownload(versionId: string, gameVersion?: string, forgeVersion?: string) {
 		if (filter === "fabric") {
 			await downloadFabric(versionId);
+		} else if (filter === "forge" && gameVersion && forgeVersion) {
+			await downloadForge(gameVersion, forgeVersion);
 		} else {
 			await addToQueue(versionId);
 		}
 
 		const raw = await getInstalledVersions();
-		const { vanilla, fabric } = getInstalledMcVersions(raw);
+		const { vanilla, fabric, forge } = getInstalledMcVersions(raw);
 		installedVanilla = vanilla;
 		installedFabric = fabric;
+		installedForge = forge;
 	}
 </script>
 
@@ -246,7 +316,7 @@
 		<div style="display: flex; align-items: center; gap: 8px;">
 			<button
 				type="button"
-				onclick={filter === "fabric" ? refreshFabric : refreshMojang}
+				onclick={refreshCurrentSource}
 				disabled={refreshing}
 				title={t("versionDownloader.refreshBtn")}
 				style="background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 4px; display: flex; align-items: center; border-radius: 4px; transition: color 0.2s;"
@@ -324,6 +394,16 @@
 				>{t("versionDownloader.tabs.fabric")}</span
 			>
 		</button>
+		<button
+			type="button"
+			class="qm-tab-btn"
+			class:active={filter === "forge"}
+			onclick={() => (filter = "forge")}
+		>
+			<span class="qm-tab-label"
+				>{t("versionDownloader.tabs.forge")}</span
+			>
+		</button>
 	</div>
 
 	<div
@@ -393,10 +473,12 @@
 		{:else}
 			<VirtualList items={displayVersions} itemHeight={66} padding={20}>
 				{#snippet children(version, _index)}
-					{@const isInstalled =
+						{@const isInstalled =
 						filter === "fabric"
 							? installedFabric.has(version.version)
-							: installedVanilla.has(version.id)}
+							: filter === "forge"
+								? installedForge.has(version.id)
+								: installedVanilla.has(version.id)}
 					<div
 						class="virtual-item-container"
 						style="padding: 0 20px;"
@@ -412,9 +494,9 @@
 									<div
 										style="font-weight: 600; font-size: 0.9rem;"
 									>
-										{filter === "fabric"
-											? version.version
-											: version.id}
+									{filter === "fabric"
+										? version.version
+										: version.id}
 									</div>
 									{#if isInstalled}
 										<span class="inst-badge"
@@ -431,6 +513,8 @@
 										Fabric Meta • {version.stable
 											? "STABLE"
 											: "UNSTABLE"}
+									{:else if filter === "forge"}
+										Forge • MC {version.game_version}
 									{:else}
 										{version.type} • {dateFmt.format(new Date(
 											version.releaseTime,
@@ -443,7 +527,11 @@
 								<div class="inst-icon">
 									<CheckIcon size={10} />
 								</div>
-							{:else if downloadingVersions.has(filter === "fabric" ? version.version : version.id)}
+							{:else if downloadingVersions.has(
+								filter === "fabric"
+									? version.version
+									: version.id,
+							)}
 								<button
 									type="button"
 									class="download-btn"
@@ -462,6 +550,8 @@
 											filter === "fabric"
 												? version.version
 												: version.id,
+											version.game_version || undefined,
+											version.forge_version || undefined,
 										)}
 								>
 									{t("versionDownloader.downloadBtn")}
@@ -478,7 +568,9 @@
 		<span class="qm-version"
 			>Source: {filter === "fabric"
 				? "Fabric Meta"
-				: "Mojang Manifest"}</span
+				: filter === "forge"
+					? "Maven (minecraftforge.net)"
+					: "Mojang Manifest"}</span
 		>
 	</div>
 </div>

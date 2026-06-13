@@ -85,6 +85,7 @@
 		"tools": "Tools",
 		"downloading": "downloading",
 		"completed": "completed",
+		"failed": "failed",
 		"noDownloads": "No downloads",
 		"noDownloadDesc": "Downloaded versions will appear here",
 		"modals": {
@@ -275,7 +276,8 @@
 			"releases": "Releases",
 			"snapshots": "Snapshots",
 			"alphas": "Alphas",
-			"fabric": "Fabric"
+			"fabric": "Fabric",
+			"forge": "Forge"
 		},
 		"downloading": "Downloading..."
 	},
@@ -326,5 +328,41 @@
 			"title": "Java Configuration",
 			"desc": "Manage Java 8, 17, 21 and 25 runtimes here. Install Java automatically from the launcher or use an existing installation. You can also configure JVM arguments and environment variables."
 		}
+	},
+	"errors": {
+		"title": "Error",
+		"INST_NOT_FOUND": "Instance not found",
+		"INST_MOD_NOT_FOUND": "Mod not found",
+		"INST_ALREADY_STARTED": "Instance is already running",
+		"INST_EXISTS": "Instance '{name}' already exists",
+		"INST_LOG_NOT_FOUND": "Log file not found",
+		"INST_FILENAME_PARSE": "Error processing filename",
+		"INST_NAME_INVALID": "Invalid instance name: {error}",
+		"INST_SRC_INVALID": "Invalid source path",
+		"INST_JRE_MISSING": "Java {version} is not installed. Install it in Settings > Java.",
+		"FS_READ_DIR": "Could not read directory '{path}': {error}",
+		"FS_READ_FILE": "Could not read file '{path}': {error}",
+		"FS_CREATE_DIR": "Could not create directory '{path}': {error}",
+		"FS_WRITE_FILE": "Could not write file '{path}': {error}",
+		"FS_COPY": "Could not copy '{from}' to '{to}': {error}",
+		"FS_RENAME": "Could not rename '{from}' to '{to}': {error}",
+		"FS_REMOVE": "Could not remove '{path}': {error}",
+		"FS_NOT_FOUND": "File not found: '{path}'",
+		"FS_INVALID_PATH": "Invalid path: '{path}'",
+		"CORE_LOCK": "Internal lock error: {error}",
+		"CORE_SERIALIZE": "Config serialization error: {error}",
+		"CORE_SAVE": "Could not save config: {error}",
+		"CORE_LOAD": "Could not load config: {error}",
+		"CORE_THREAD": "Thread error: {error}",
+		"DL_CANT_FETCH": "Network error: {error}",
+		"DL_CANT_READ": "Error reading response: {error}",
+		"DL_JSON_PARSE": "JSON parse error: {error}",
+		"DL_NO_FABRIC": "No Fabric loader found for this version",
+		"AUTH_DEVICE_CODE": "Could not get device code: {error}",
+		"AUTH_FAILED": "Microsoft authentication failed: {error}",
+		"AUTH_TOKENS_SAVE": "Could not save tokens: {error}",
+		"AUTH_TOKENS_DEL": "Could not delete tokens: {error}",
+		"AUTH_BLOCKED": "Internal error: {error}",
+		"GENERIC": "An unexpected error occurred: {error}"
 	}
 }

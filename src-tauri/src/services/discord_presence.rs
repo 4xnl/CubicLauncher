@@ -38,7 +38,7 @@ pub async fn init() -> Result<(), &'static str> {
     {
         let guard = presence.client.lock().await;
         if guard.is_some() {
-            return Err("Discord client already running");
+            return Ok(());
         }
     }
 

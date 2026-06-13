@@ -3,14 +3,15 @@ use std::path::{Path, PathBuf};
 use std::pin::Pin;
 
 use log::info;
+use tokio::sync::mpsc::Sender;
 use uuid::Uuid;
 
 use super::batch::{DownloadBatch, DownloadItemSpec};
 use crate::manifest::{resolve_asset_index, resolve_version_data};
-use crate::types::{AssetMeta, NormalizedVersion, RESOURCES_BASE_URL};
+use crate::types::{AssetMeta, DownloadProgress, NormalizedVersion, RESOURCES_BASE_URL};
 use zellkern::resolvers::natives_subdir;
 use crate::utilities::download_file;
-use crate::ProtonError;
+use crate::AquaError;
 use crate::utilities::HTTP_CLIENT;
 
 #[derive(Clone)]
@@ -41,7 +42,7 @@ pub struct MinecraftBatch {
 }
 
 impl MinecraftBatch {
-    pub async fn new(game_path: &Path, version_id: &str) -> Result<Self, ProtonError> {
+    pub async fn new(game_path: &Path, version_id: &str) -> Result<Self, AquaError> {
         let version = resolve_version_data(version_id).await?;
         let mc_version = &version.parsed_version;
         let dirs = compute_dirs(game_path, version_id, mc_version);
@@ -118,7 +119,7 @@ impl DownloadBatch for MinecraftBatch {
         &self.items
     }
 
-    fn prepare(&self) -> Pin<Box<dyn Future<Output = Result<(), ProtonError>> + Send + '_>> {
+    fn prepare(&self) -> Pin<Box<dyn Future<Output = Result<(), AquaError>> + Send + '_>> {
         let dirs = self.dirs.clone();
         let version_id = self.version.id.clone();
         let asset_index = self.version.asset_index.clone();
@@ -138,7 +139,10 @@ impl DownloadBatch for MinecraftBatch {
         })
     }
 
-    fn finalize(&self) -> Pin<Box<dyn Future<Output = Result<(), ProtonError>> + Send + '_>> {
+    fn finalize(
+        &self,
+        _progress_tx: Option<Sender<DownloadProgress>>,
+    ) -> Pin<Box<dyn Future<Output = Result<(), AquaError>> + Send + '_>> {
         let temp_dir = self.temp_dir.clone();
         let natives_dir = self.dirs.natives_dir.clone();
         let jar_paths: Vec<PathBuf> = self
@@ -199,7 +203,7 @@ impl DownloadBatch for MinecraftBatch {
 async fn download_version_json(
     version_id: &str,
     dirs: &DirPaths,
-) -> Result<(), ProtonError> {
+) -> Result<(), AquaError> {
     let path = dirs.versions_dir.join(format!("{}.json", version_id));
     if path.exists() {
         return Ok(());
@@ -210,10 +214,10 @@ async fn download_version_json(
     let entry = v2["versions"]
         .as_array()
         .and_then(|arr| arr.iter().find(|v| v["id"] == version_id))
-        .ok_or_else(|| ProtonError::VersionNotFound(version_id.to_string()))?;
+        .ok_or_else(|| AquaError::VersionNotFound(version_id.to_string()))?;
     let detail_url = entry["url"]
         .as_str()
-        .ok_or_else(|| ProtonError::Other("No URL in manifest".into()))?;
+        .ok_or_else(|| AquaError::Other("No URL in manifest".into()))?;
 
     let detail = HTTP_CLIENT.get(detail_url).send().await?.text().await?;
     tokio::fs::write(&path, detail).await?;
@@ -224,7 +228,7 @@ async fn download_version_json(
 async fn download_asset_index_json(
     asset_index: &AssetMeta,
     dirs: &DirPaths,
-) -> Result<(), ProtonError> {
+) -> Result<(), AquaError> {
     let path = dirs
         .assets_indexes_dir
         .join(format!("{}.json", asset_index.id));
