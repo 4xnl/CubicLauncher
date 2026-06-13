@@ -6,6 +6,7 @@ import {
 	getSettings,
 	updateSettings,
 	initDiscordPresence,
+	shutdownDiscordPresence,
 } from "./cubicApi";
 import { applyTheme } from "./themeManager";
 
@@ -85,6 +86,8 @@ export async function saveSettings(): Promise<void> {
 	await updateSettings(launcherStore.settings);
 	if (launcherStore.settings.discord_presence && !prev) {
 		await initDiscordPresence();
+	} else if (!launcherStore.settings.discord_presence && prev) {
+		await shutdownDiscordPresence();
 	}
 }
 

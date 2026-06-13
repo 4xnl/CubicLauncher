@@ -56,6 +56,7 @@ pub fn run() {
             commands::pack::parse_mrpack,
             commands::pack::install_mrpack,
             commands::discord::init_discord_presence,
+            commands::discord::shutdown_discord_presence,
             commands::java::get_jre_status,
             commands::java::install_jre,
             commands::java::uninstall_jre,

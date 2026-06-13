@@ -295,6 +295,14 @@ export async function initDiscordPresence(): Promise<void> {
 	}
 }
 
+export async function shutdownDiscordPresence(): Promise<void> {
+	try {
+		await invoke("shutdown_discord_presence");
+	} catch (err) {
+		console.error("Error al apagar Discord Presence:", err);
+	}
+}
+
 export async function openUrl(url: string): Promise<void> {
 	await invoke("open_url", { url });
 }

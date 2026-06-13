@@ -114,6 +114,24 @@ async fn set_playing(name: String, version: String, loader: String) {
         }
 }
 
+pub async fn shutdown() {
+    let presence = match DISCORD.get() {
+        Some(p) => p,
+        None => return,
+    };
+
+    {
+        let mut guard = presence.first_instance.lock().await;
+        *guard = None;
+    }
+
+    let mut guard = presence.client.lock().await;
+    if let Some(client) = guard.take() {
+        info!("Shutting down Discord RPC client");
+        client.shutdown().await;
+    }
+}
+
 pub async fn on_instance_start(name: String, version: String, loader: String) {
     let presence = match DISCORD.get() {
         Some(p) => p,
