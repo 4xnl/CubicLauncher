@@ -1,39 +1,46 @@
 import { launcherStore } from "$lib/state/state.svelte";
 import es from "./es.json";
 import en from "./en.json";
+import fr from "./fr.json";
 
 type DictValue = string | { [key: string]: DictValue };
-const dicts: Record<string, DictValue> = { es, en };
+const dicts: Record<string, DictValue> = { es, en, fr };
 
-const cache = new Map<string, string>();
+let flat: Record<string, string> = {};
 let lastLang = "";
+
+function flatten(obj: Record<string, DictValue>, prefix = ""): Record<string, string> {
+	const result: Record<string, string> = {};
+	for (const key in obj) {
+		const val = obj[key];
+		if (typeof val === "string") {
+			result[prefix + key] = val;
+		} else {
+			Object.assign(result, flatten(val, prefix + key + "."));
+		}
+	}
+	return result;
+}
+
+function ensureLang(lang: string): void {
+	if (lang !== lastLang) {
+		const dict = dicts[lang] || dicts["es"];
+		flat = dict && typeof dict === "object" ? flatten(dict) : {};
+		lastLang = lang;
+	}
+}
 
 export function t(
 	key: string,
 	params?: Record<string, string | number>,
 ): string {
 	const lang = launcherStore.settings?.language || "es";
-	if (lang !== lastLang) {
-		cache.clear();
-		lastLang = lang;
-	}
-	if (!params) {
-		const cached = cache.get(key);
-		if (cached !== undefined) return cached;
-	}
-	const dict = dicts[lang] || dicts["es"];
-	if (!dict || typeof dict === "string") return key;
-	let value: DictValue = dict;
-	for (const k of key.split(".")) {
-		if (typeof value === "string") return key;
-		value = value[k];
-		if (value === undefined) return key;
-	}
-	const result = typeof value === "string" ? value : key;
-	if (!params) {
-		cache.set(key, result);
-		return result;
-	}
+	ensureLang(lang);
+
+	const result = flat[key];
+	if (result === undefined) return key;
+	if (!params) return result;
+
 	return result.replace(/\{(\w+)\}/g, (_, name) =>
 		String(params[name] ?? `{${name}}`),
 	);

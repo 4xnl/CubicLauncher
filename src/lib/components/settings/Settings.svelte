@@ -125,6 +125,7 @@
 	const languageOptions = [
 		{ value: "es", label: "Español" },
 		{ value: "en", label: "English" },
+		{ value: "fr", label: "Français" },
 	];
 	let availableThemes = $state<ThemeEntry[]>([]);
 	let themeOptions = $derived(
