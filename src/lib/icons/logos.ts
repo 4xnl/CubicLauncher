@@ -3,5 +3,4 @@ export const INSTANCE_LOGOS = [
 	"fabric.png",
 	"forge.png",
 	"modth.png",
-	"ftb.png",
 ];

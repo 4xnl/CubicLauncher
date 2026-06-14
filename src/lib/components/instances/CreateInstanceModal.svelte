@@ -5,15 +5,12 @@
 		getInstalledVersions,
 		parseMrpack,
 		installMrpack,
-		parseCurseManifest,
-		parseCurseManifestAndInstall,
 	} from "$lib/api/cubicApi";
 	import { INSTANCE_LOGOS } from "$lib/icons/logos";
 	import Select from "$lib/components/layout/Select.svelte";
 	import ModalBase from "$lib/components/layout/ModalBase.svelte";
-	import FtbModpackBrowser from "$lib/components/instances/FtbModpackBrowser.svelte";
 	import { t } from "$lib/i18n";
-	import type { MrpackInfo, CurseManifestInfo } from "$lib/types/types";
+	import type { MrpackInfo } from "$lib/types/types";
 	import { open as openDialog } from "@tauri-apps/plugin-dialog";
 
 	let {
@@ -42,11 +39,8 @@
 	);
 
 	// Modpack
-	type AnyPackInfo = MrpackInfo | CurseManifestInfo;
-	let packInfo = $state<AnyPackInfo | null>(null);
-	let packType = $state<"mrpack" | "curse">("mrpack");
+	let packInfo = $state<MrpackInfo | null>(null);
 	let parsing = $state(false);
-	let showFtbBrowser = $state(false);
 
 	// ── Common ────────────────────────────────────────────────────────────────
 	let loading = $state(false);
@@ -131,29 +125,14 @@
 		parsing = true;
 		error = null;
 		try {
-			const isZip = mrpackPath.toLowerCase().endsWith(".zip");
-			if (isZip) {
-				const info = await parseCurseManifest(mrpackPath);
-				if (info) {
-					packInfo = info;
-					packType = "curse";
-					if (!name.trim()) name = info.name;
-					const loaderIcon = selectIconForLoader(info.loader);
-					if (loaderIcon) selectedIcon = loaderIcon;
-				} else {
-					error = "No se pudo leer el archivo. Asegúrate de que sea un modpack válido.";
-				}
+			const info = await parseMrpack(mrpackPath);
+			if (info) {
+				packInfo = info;
+				if (!name.trim()) name = info.name;
+				const loaderIcon = selectIconForLoader(info.loader);
+				if (loaderIcon) selectedIcon = loaderIcon;
 			} else {
-				const info = await parseMrpack(mrpackPath);
-				if (info) {
-					packInfo = info;
-					packType = "mrpack";
-					if (!name.trim()) name = info.name;
-					const loaderIcon = selectIconForLoader(info.loader);
-					if (loaderIcon) selectedIcon = loaderIcon;
-				} else {
-					error = "No se pudo leer el archivo .mrpack";
-				}
+				error = "No se pudo leer el archivo .mrpack";
 			}
 		} finally {
 			parsing = false;
@@ -171,26 +150,26 @@
 		return null;
 	}
 
-	function getPackName(info: AnyPackInfo): string {
+	function getPackName(info: MrpackInfo): string {
 		return info.name;
 	}
-	function getPackVersion(info: AnyPackInfo): string {
-		return "version_id" in info ? info.version_id : info.version;
+	function getPackVersion(info: MrpackInfo): string {
+		return info.version_id;
 	}
-	function getPackMcVersion(info: AnyPackInfo): string | null {
-		return "minecraft_version" in info ? info.minecraft_version : null;
+	function getPackMcVersion(info: MrpackInfo): string | null {
+		return info.minecraft_version;
 	}
-	function getPackLoader(info: AnyPackInfo): string | null {
-		return "loader" in info ? info.loader : null;
+	function getPackLoader(info: MrpackInfo): string | null {
+		return info.loader;
 	}
-	function getPackLoaderVersion(info: AnyPackInfo): string | null {
-		return "loader_version" in info ? info.loader_version : null;
+	function getPackLoaderVersion(info: MrpackInfo): string | null {
+		return info.loader_version;
 	}
-	function getPackSummary(info: AnyPackInfo): string | null {
-		return "summary" in info ? (info.summary ?? null) : null;
+	function getPackSummary(info: MrpackInfo): string | null {
+		return info.summary ?? null;
 	}
-	function getPackFileCount(info: AnyPackInfo): number {
-		return "file_count" in info ? info.file_count : 0;
+	function getPackFileCount(info: MrpackInfo): number {
+		return info.file_count;
 	}
 
 	// ── Create / Import ──────────────────────────────────────────────────────
@@ -238,37 +217,20 @@
 		loading = true;
 		error = null;
 		try {
-			if (packType === "curse") {
-				const result = await parseCurseManifestAndInstall(
-					mrpackPath,
-					name.trim(),
-					() => {
-						open = false;
-						mrpackPath = null;
-						resetState();
-						oncreated?.();
-					},
-					(err: unknown) => {
-						error = `Error al importar: ${err}`;
-					},
-				);
-				if (!result) error = "Error al importar el modpack";
-			} else {
-				const result = await installMrpack(
-					mrpackPath,
-					name.trim(),
-					() => {
-						open = false;
-						mrpackPath = null;
-						resetState();
-						oncreated?.();
-					},
-					(err: unknown) => {
-						error = `Error al importar: ${err}`;
-					},
-				);
-				if (!result) error = "Error al importar el modpack";
-			}
+			const result = await installMrpack(
+				mrpackPath,
+				name.trim(),
+				() => {
+					open = false;
+					mrpackPath = null;
+					resetState();
+					oncreated?.();
+				},
+				(err: unknown) => {
+					error = `Error al importar: ${err}`;
+				},
+			);
+			if (!result) error = "Error al importar el modpack";
 		} finally {
 			loading = false;
 		}
@@ -279,7 +241,7 @@
 		try {
 			const selected = await openDialog({
 				multiple: false,
-				filters: [{ name: "Modpacks", extensions: ["mrpack", "zip"] }],
+				filters: [{ name: "Modpacks", extensions: ["mrpack"] }],
 			});
 			if (selected) {
 				mrpackPath = selected;
@@ -299,11 +261,9 @@
 		error = null;
 		parsing = false;
 		packInfo = null;
-		packType = "mrpack";
 		loading = false;
 		currentStep = 0;
 		contentSource = "version";
-		showFtbBrowser = false;
 	}
 
 	function reset() {
@@ -312,11 +272,6 @@
 		resetState();
 	}
 
-	function onFtbInstalled() {
-		open = false;
-		resetState();
-		oncreated?.();
-	}
 </script>
 
 <ModalBase bind:open title={t("createInstance.title")} width="700px" onclose={reset}>
@@ -464,16 +419,7 @@
 									{t("createInstance.selectFile")}
 								</button>
 							</div>
-							<div class="ftb-section">
-								<div class="ftb-divider"><span>{t("createInstance.orDownloadFrom")}</span></div>
-								<button type="button" class="ftb-open-btn" onclick={() => (showFtbBrowser = !showFtbBrowser)}>
-									<img src="/images/instances/ftb.png" alt="FTB" class="ftb-icon" />
-									FTB Modpacks
-								</button>
-								{#if showFtbBrowser}
-									<FtbModpackBrowser onInstalled={onFtbInstalled} />
-								{/if}
-							</div>
+
 						{:else if packInfo}
 							<div class="pack-info">
 								<div class="info-row">
@@ -500,7 +446,7 @@
 								</div>
 								<div class="info-row">
 									<span class="info-label">Formato</span>
-									<span class="info-value">{packType === "mrpack" ? "Modrinth" : "CurseForge/FTB"}</span>
+									<span class="info-value">Modrinth</span>
 								</div>
 								<div class="info-row">
 									<span class="info-label">Archivos</span>
@@ -853,57 +799,6 @@
 	.btn-change-file:hover {
 		color: var(--text-primary);
 		border-color: var(--text-secondary);
-	}
-
-	/* ── Modpack: FTB section ──────────────────────────────────────────── */
-	.ftb-section {
-		margin-top: 14px;
-	}
-
-	.ftb-divider {
-		display: flex;
-		align-items: center;
-		gap: 12px;
-		margin-bottom: 10px;
-		font-size: 0.7rem;
-		color: var(--text-secondary);
-		text-transform: uppercase;
-		letter-spacing: 0.5px;
-	}
-
-	.ftb-divider::before,
-	.ftb-divider::after {
-		content: "";
-		flex: 1;
-		height: 1px;
-		background: var(--border);
-	}
-
-	.ftb-open-btn {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		gap: 8px;
-		width: 100%;
-		padding: 10px;
-		background: rgba(var(--accent-rgb, 255, 255, 255), 0.03);
-		border: 1px solid var(--border);
-		border-radius: var(--border-radius-sm);
-		color: var(--text-primary);
-		font-size: 0.85rem;
-		font-weight: 600;
-		cursor: pointer;
-		transition: background 0.15s, border-color 0.15s;
-	}
-
-	.ftb-open-btn:hover {
-		background: rgba(var(--accent-rgb, 255, 255, 255), 0.06);
-		border-color: var(--text-secondary);
-	}
-
-	.ftb-icon {
-		width: 20px;
-		height: 20px;
 	}
 
 	/* ── Shared input styles ───────────────────────────────────────────── */
