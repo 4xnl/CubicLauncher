@@ -1,0 +1,111 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly CUBIC_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+readonly NIX_DIR="$CUBIC_DIR/dist/nix"
+
+GREEN='\033[0;32m'
+CYAN='\033[0;36m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+NC='\033[0m'
+
+log()  { echo -e "${GREEN}[+]${NC} $1"; }
+info() { echo -e "${CYAN}[*]${NC} $1"; }
+warn() { echo -e "${YELLOW}[!]${NC} $1"; }
+err()  { echo -e "${RED}[-]${NC} $1"; }
+
+cleanup() {
+    warn "Limpiando build anterior..."
+    rm -f "$NIX_DIR/result"
+    rm -rf "${NIX_DIR}/cubiclauncher-build"
+}
+
+build_nix_build() {
+    info "Usando nix-build (release.nix)..."
+    pushd "$NIX_DIR" >/dev/null
+    nix-build release.nix -o result 2>&1 | tail -5
+    popd >/dev/null
+}
+
+build_flake() {
+    info "Usando flake..."
+    pushd "$NIX_DIR" >/dev/null
+    nix build --extra-experimental-features 'nix-command flakes' \
+        --no-write-lock-file \
+        -o result 2>&1 | tail -5
+    popd >/dev/null
+}
+
+build_remote() {
+    info "Construyendo desde GitHub..."
+    nix build "github:CubicLauncher/CubicLauncher?dir=dist/nix" \
+        --extra-experimental-features 'nix-command flakes' \
+        --no-write-lock-file \
+        -o "$NIX_DIR/result" 2>&1 | tail -5
+}
+
+show_result() {
+    if [[ -L "$NIX_DIR/result" ]]; then
+        log "Build completado exitosamente."
+        log "Binario: $NIX_DIR/result/bin/cubiclauncher"
+        echo ""
+        info "Para ejecutar:  $NIX_DIR/result/bin/cubiclauncher"
+        info "Para instalar: nix-env -f $NIX_DIR/release.nix -i"
+    else
+        err "El build falló. Revisa los mensajes de error arriba."
+        exit 1
+    fi
+}
+
+if ! command -v nix &>/dev/null; then
+    err "Nix no está instalado."
+    err "Instálalo primero: https://nixos.org/download.html"
+    exit 1
+fi
+
+echo ""
+echo "=============================="
+echo "  CubicLauncher — Builder"
+echo "=============================="
+echo ""
+
+MODE="${1:-}"
+if [[ -z "$MODE" ]]; then
+    echo "Selecciona modo de build:"
+    echo "  1) Local (nix-build)"
+    echo "  2) Local (flake)"
+    echo "  3) Remoto (GitHub)"
+    echo ""
+    read -rp "Opción [1-3] (default: 1): " choice
+    case "${choice:-1}" in
+        1) MODE="local-nix-build" ;;
+        2) MODE="local-flake" ;;
+        3) MODE="remote" ;;
+        *) MODE="local-nix-build" ;;
+    esac
+fi
+
+case "$MODE" in
+    local-nix-build)
+        build_nix_build
+        ;;
+    local-flake)
+        build_flake
+        ;;
+    remote)
+        build_remote
+        ;;
+    clean)
+        cleanup
+        exit 0
+        ;;
+    *)
+        err "Modo desconocido: $MODE"
+        echo "Usos: $0 [local-nix-build|local-flake|remote|clean]"
+        exit 1
+        ;;
+esac
+
+show_result
