@@ -16,9 +16,10 @@
 	import Tutorial from "$lib/components/layout/welcome.svelte";
 	import { initDiscordPresence } from "$lib/api/cubicApi";
 	import { t } from "$lib/i18n";
-	import { applyTheme } from "$lib/api/themeManager";
+	import { applyTheme, importThemeZip } from "$lib/api/themeManager";
 	import { checkForUpdates } from "$lib/api/updaterServices";
 	import { saveSettings } from "$lib/api/launcherService";
+	import { showSuccess, showError } from "$lib/state/state.svelte";
 	import CreateInstanceModal from "$lib/components/instances/CreateInstanceModal.svelte";
 	import LogWindow from "$lib/components/log/LogWindow.svelte";
 
@@ -39,6 +40,7 @@
 	let openCreateModal = $state(false);
 	let droppedMrpackPath = $state<string | null>(null);
 	let isDragOver = $state(false);
+	let dragPaths = $state<string[]>([]);
 
 	let showTutorial = $state(false);
 	let SettingsComponent = $state<Component<{ onclose: () => void }> | null>(
@@ -87,32 +89,53 @@
 			const { getCurrentWebview } = await import("@tauri-apps/api/webview");
 			const webview = getCurrentWebview();
 			await webview.onDragDropEvent((event) => {
-				if (event.payload.type === "over") {
-					const payload = event.payload as { paths?: string[]; position: { x: number; y: number } };
+				if (event.payload.type === "enter") {
+					const payload = event.payload as { paths: string[] };
+					dragPaths = payload.paths ?? [];
 					isDragOver =
-						!!payload.paths &&
-						payload.paths.length > 0 &&
-						payload.paths.some(
-							(p) =>
-								p.endsWith(".mrpack") || p.endsWith(".zip"),
+						dragPaths.length > 0 &&
+						dragPaths.some(
+							(p) => p.endsWith(".mrpack") || p.endsWith(".zip"),
 						);
 				} else if (event.payload.type === "leave") {
 					isDragOver = false;
+					dragPaths = [];
 				} else if (event.payload.type === "drop") {
 					isDragOver = false;
-					const paths = event.payload.paths as string[];
-					const mrpackFile = paths.find(
-						(p: string) =>
-							p.endsWith(".mrpack") || p.endsWith(".zip"),
+					const paths = (event.payload as { paths: string[] }).paths ?? [];
+					const zipFile = paths.find(
+						(p: string) => p.endsWith(".zip"),
 					);
-					if (mrpackFile) {
+					const mrpackFile = paths.find(
+						(p: string) => p.endsWith(".mrpack"),
+					);
+					if (zipFile) {
+						handleZipDrop(zipFile);
+					} else if (mrpackFile) {
 						droppedMrpackPath = mrpackFile;
 						openCreateModal = true;
 					}
+					dragPaths = [];
 				}
 			});
 		} catch (e) {
-			console.warn("Drag-drop not available, falling back:", e);
+			console.warn("Drag-drop not available:", e);
+		}
+	}
+
+	async function handleZipDrop(zipPath: string) {
+		try {
+			await importThemeZip(zipPath);
+			showSuccess(t("themes.importSuccess"), t("themes.importSuccessMessage"));
+			applyTheme(launcherStore.settings.theme);
+		} catch (e) {
+			const msg = String(e);
+			if (msg.includes("no se encontró theme.json") || msg.includes("no theme.json")) {
+				droppedMrpackPath = zipPath;
+				openCreateModal = true;
+			} else {
+				showError(t("themes.importError"), msg);
+			}
 		}
 	}
 
@@ -148,8 +171,8 @@
 		<div class="drag-overlay">
 			<div class="drag-overlay-content">
 				<span>📦</span>
-				<h2>Suelta tu modpack</h2>
-				<p>Los archivos .mrpack se importarán automáticamente</p>
+				<h2>Suelta tu modpack o theme aquí</h2>
+				<p>Los archivos .mrpack y .zip se importarán automáticamente</p>
 			</div>
 		</div>
 	{/if}

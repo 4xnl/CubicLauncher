@@ -7,6 +7,7 @@
 	interface Option {
 		value: string;
 		label: string;
+		badge?: string;
 	}
 
 	let {
@@ -133,7 +134,10 @@
 					aria-selected={option.value === value}
 					tabindex="0"
 				>
-					{option.label}
+					<span class="select-option-label">{option.label}</span>
+					{#if option.badge}
+						<span class="select-option-badge">{option.badge}</span>
+					{/if}
 					{#if option.value === value}
 						<CheckIcon size={14} class="check-icon" />
 					{/if}

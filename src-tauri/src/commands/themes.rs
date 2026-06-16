@@ -4,6 +4,7 @@ use crate::services::SettingsManager;
 use crate::theme_watcher::ThemeWatcher;
 use compact_str::CompactString;
 use serde::{Deserialize, Serialize};
+use std::io::Read;
 use tauri::command;
 use tracing::{error, info, warn};
 
@@ -126,7 +127,6 @@ pub fn get_user_theme(id: String) -> Result<ThemeFile, String> {
         let is_image = std::fs::File::open(bg)
             .ok()
             .and_then(|mut f| {
-                use std::io::Read;
                 let mut buf = [0u8; 16];
                 f.read_exact(&mut buf).ok()?;
                 Some(infer::is_image(&buf))
@@ -206,7 +206,15 @@ pub fn import_theme(source_path: String) -> Result<ThemeEntry, String> {
         CoreError::Other(format!("El archivo no es un theme válido: {}", e)).to_string()
     })?;
 
-    let theme_id = theme_file.name.to_lowercase().replace(' ', "_");
+    let theme_id = if theme_file.author.is_empty() {
+        theme_file.name.to_lowercase().replace(' ', "_")
+    } else {
+        format!(
+            "{}_{}",
+            theme_file.name.to_lowercase().replace(' ', "_"),
+            theme_file.author.to_lowercase().replace(' ', "_")
+        )
+    };
     let theme_dir = PathManager::get().get_themes_dir().join(&theme_id);
 
     if theme_dir.exists() {
@@ -254,6 +262,190 @@ pub fn import_theme(source_path: String) -> Result<ThemeEntry, String> {
 
     info!(
         "Theme importado: id='{}', name='{}'",
+        theme_id, theme_file.name
+    );
+    Ok(ThemeEntry {
+        id: theme_id.into(),
+        name: theme_file.name,
+        author: theme_file.author,
+        r#type: "user".into(),
+    })
+}
+
+#[command]
+pub fn import_theme_zip(zip_path: String) -> Result<ThemeEntry, String> {
+    info!("Importando theme ZIP desde '{}'", zip_path);
+    let source = std::path::Path::new(&zip_path);
+    if !source.exists() {
+        error!("Archivo ZIP no existe: {}", zip_path);
+        return Err(FsError::NotFound(zip_path.clone()).to_string());
+    }
+
+    let file = std::fs::File::open(source).map_err(|e| {
+        FsError::ReadFile {
+            path: zip_path.clone(),
+            source: e,
+        }
+        .to_string()
+    })?;
+
+    let mut archive = zip::ZipArchive::new(file).map_err(|e| {
+        CoreError::Other(format!("Archivo ZIP inválido: {}", e)).to_string()
+    })?;
+
+    // Buscar theme.json en la raíz o en un único subdirectorio
+    let theme_json_name = {
+        let mut found_root = false;
+        let mut found_subdir: Option<String> = None;
+        let mut invalid = false;
+
+        for i in 0..archive.len() {
+            let entry = archive.by_index(i).map_err(|e| {
+                CoreError::Other(format!("Error leyendo ZIP: {}", e)).to_string()
+            })?;
+            let name = entry.name().to_string();
+
+            if name == "theme.json" {
+                found_root = true;
+            } else if name.ends_with("/theme.json") {
+                if found_subdir.is_some() || found_root {
+                    invalid = true;
+                    break;
+                }
+                found_subdir = Some(name);
+            }
+        }
+
+        if invalid || (found_root && found_subdir.is_some()) {
+            return Err(CoreError::Other(
+                "ZIP inválido: múltiples theme.json encontrados".into(),
+            )
+            .to_string());
+        }
+
+        match (found_root, found_subdir) {
+            (true, _) => Some("theme.json".to_string()),
+            (_, Some(sub)) => Some(sub),
+            _ => None,
+        }
+    };
+
+    let theme_json_name = match theme_json_name {
+        Some(name) => name,
+        None => {
+            return Err(CoreError::Other(
+                "ZIP inválido: no se encontró theme.json".into(),
+            )
+            .to_string());
+        }
+    };
+
+    // Leer y validar theme.json
+    let theme_json_content = {
+        let mut buf = String::new();
+        let mut entry = archive.by_name(&theme_json_name).map_err(|e| {
+            CoreError::Other(format!("Error leyendo theme.json: {}", e)).to_string()
+        })?;
+        entry.read_to_string(&mut buf).map_err(|e| {
+            CoreError::Other(format!("Error leyendo theme.json: {}", e)).to_string()
+        })?;
+        buf
+    };
+
+    let theme_file: ThemeFile = serde_json::from_str(&theme_json_content).map_err(|e| {
+        CoreError::Other(format!("theme.json inválido: {}", e)).to_string()
+    })?;
+
+    let theme_id = if theme_file.author.is_empty() {
+        theme_file.name.to_lowercase().replace(' ', "_")
+    } else {
+        format!(
+            "{}_{}",
+            theme_file.name.to_lowercase().replace(' ', "_"),
+            theme_file.author.to_lowercase().replace(' ', "_")
+        )
+    };
+    let theme_dir = PathManager::get().get_themes_dir().join(&theme_id);
+
+    // Sobreescribir si ya existe
+    if theme_dir.exists() {
+        info!("Sobreescribiendo theme existente '{}'", theme_id);
+        if let Err(e) = std::fs::remove_dir_all(&theme_dir) {
+            error!("Error eliminando theme existente '{}': {}", theme_id, e);
+            return Err(FsError::Remove {
+                path: theme_dir.to_string_lossy().to_string(),
+                source: e,
+            }
+            .to_string());
+        }
+    }
+
+    std::fs::create_dir_all(&theme_dir).map_err(|e| {
+        FsError::CreateDir {
+            path: theme_dir.to_string_lossy().to_string(),
+            source: e,
+        }
+        .to_string()
+    })?;
+
+    // Determinar el prefijo del directorio dentro del ZIP (si lo hay)
+    let prefix = if theme_json_name == "theme.json" {
+        String::new()
+    } else {
+        // "some_dir/theme.json" → "some_dir/"
+        theme_json_name
+            .strip_suffix("theme.json")
+            .unwrap_or("")
+            .to_string()
+    };
+
+    // Extraer todos los archivos del ZIP
+    for i in 0..archive.len() {
+        let mut entry = archive.by_index(i).map_err(|e| {
+            CoreError::Other(format!("Error leyendo ZIP: {}", e)).to_string()
+        })?;
+
+        let entry_name = entry.name().to_string();
+
+        // Saltar directorios y el prefijo
+        let relative = match entry_name.strip_prefix(&prefix) {
+            Some(r) => r.to_string(),
+            None => continue,
+        };
+
+        if relative.is_empty() || relative.ends_with('/') {
+            continue;
+        }
+
+        let out_path = theme_dir.join(&relative);
+
+        // Crear directorio padre si necesario
+        if let Some(parent) = out_path.parent() {
+            if let Err(e) = std::fs::create_dir_all(parent) {
+                warn!("Error creando directorio {:?}: {}", parent, e);
+                continue;
+            }
+        }
+
+        let mut out_file = std::fs::File::create(&out_path).map_err(|e| {
+            FsError::WriteFile {
+                path: out_path.to_string_lossy().to_string(),
+                source: e,
+            }
+            .to_string()
+        })?;
+
+        std::io::copy(&mut entry, &mut out_file).map_err(|e| {
+            FsError::WriteFile {
+                path: out_path.to_string_lossy().to_string(),
+                source: e,
+            }
+            .to_string()
+        })?;
+    }
+
+    info!(
+        "Theme ZIP importado: id='{}', name='{}'",
         theme_id, theme_file.name
     );
     Ok(ThemeEntry {

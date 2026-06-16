@@ -132,6 +132,7 @@
 		availableThemes.map((t: ThemeEntry) => ({
 			value: t.id,
 			label: t.name,
+			badge: t.author,
 		})),
 	);
 

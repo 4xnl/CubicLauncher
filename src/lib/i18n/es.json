@@ -308,7 +308,12 @@
 			"title": "Fondo del Theme",
 			"largeFile": "El fondo supera los 25MB — no se cargará",
 			"notAnImage": "El fondo no es una imagen válida — no se cargará"
-		}
+		},
+		"importSuccess": "Theme importado",
+		"importSuccessMessage": "El theme se ha importado y aplicado correctamente.",
+		"importError": "Error al importar theme",
+		"dropHere": "Suelta el ZIP del theme aquí",
+		"invalidZip": "Theme inválido: no se encontró theme.json en el ZIP"
 	},
 	"downloadProgress": {
 		"items": "objetos"

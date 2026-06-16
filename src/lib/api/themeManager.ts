@@ -34,6 +34,10 @@ export async function listThemes(): Promise<ThemeEntry[]> {
 	return [...builtinThemes, ...prefixed];
 }
 
+export async function importThemeZip(zipPath: string): Promise<ThemeEntry> {
+	return invoke<ThemeEntry>("import_theme_zip", { zipPath });
+}
+
 export async function applyTheme(themeId: string) {
 	const gen = ++currentGeneration;
 

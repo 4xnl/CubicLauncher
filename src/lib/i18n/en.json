@@ -308,7 +308,12 @@
 			"title": "Theme Background",
 			"largeFile": "Background exceeds 25MB — will not be loaded",
 			"notAnImage": "Background is not a valid image — will not be loaded"
-		}
+		},
+		"importSuccess": "Theme imported",
+		"importSuccessMessage": "The theme has been imported and applied successfully.",
+		"importError": "Error importing theme",
+		"dropHere": "Drop theme ZIP here",
+		"invalidZip": "Invalid theme: no theme.json found in ZIP"
 	},
 	"downloadProgress": {
 		"items": "items"

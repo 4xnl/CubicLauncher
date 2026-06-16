@@ -202,6 +202,27 @@
 	color: var(--accent);
 }
 
+.select-option-label {
+	flex: 1;
+	min-width: 0;
+}
+
+.select-option-badge {
+	font-size: 0.7rem;
+	color: var(--text-muted);
+	background: rgba(255, 255, 255, 0.05);
+	padding: 1px 6px;
+	border-radius: 3px;
+	margin-left: 6px;
+	white-space: nowrap;
+	flex-shrink: 0;
+}
+
+.select-option:hover .select-option-badge {
+	color: var(--text-secondary);
+	background: rgba(255, 255, 255, 0.08);
+}
+
 .select-dropdown:global(::-webkit-scrollbar) {
 	width: 4px;
 }

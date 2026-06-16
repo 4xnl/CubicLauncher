@@ -308,7 +308,12 @@
 			"title": "Arrière-plan du Thème",
 			"largeFile": "L'arrière-plan dépasse 25 Mo — il ne sera pas chargé",
 			"notAnImage": "L'arrière-plan n'est pas une image valide — il ne sera pas chargé"
-		}
+		},
+		"importSuccess": "Thème importé",
+		"importSuccessMessage": "Le thème a été importé et appliqué avec succès.",
+		"importError": "Erreur lors de l'importation du thème",
+		"dropHere": "Déposez le ZIP du thème ici",
+		"invalidZip": "Thème invalide : aucun theme.json trouvé dans le ZIP"
 	},
 	"downloadProgress": {
 		"items": "éléments"
