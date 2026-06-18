@@ -157,6 +157,8 @@
 				const v = Number(event.payload.data.version);
 				jreActionStates[v] = undefined;
 				refreshJreStatus();
+			} else if (event.payload.type === "JREChanged") {
+				refreshJreStatus();
 			}
 		});
 
