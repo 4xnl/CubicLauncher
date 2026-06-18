@@ -2,14 +2,18 @@ import { launcherStore } from "$lib/state/state.svelte";
 import es from "./es.json";
 import en from "./en.json";
 import fr from "./fr.json";
+import de from "./de.json";
 
 type DictValue = string | { [key: string]: DictValue };
-const dicts: Record<string, DictValue> = { es, en, fr };
+const dicts: Record<string, DictValue> = { es, en, fr, de };
 
 let flat: Record<string, string> = {};
 let lastLang = "";
 
-function flatten(obj: Record<string, DictValue>, prefix = ""): Record<string, string> {
+function flatten(
+	obj: Record<string, DictValue>,
+	prefix = "",
+): Record<string, string> {
 	const result: Record<string, string> = {};
 	for (const key in obj) {
 		const val = obj[key];

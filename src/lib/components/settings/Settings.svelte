@@ -126,13 +126,16 @@
 		{ value: "es", label: "Español" },
 		{ value: "en", label: "English" },
 		{ value: "fr", label: "Français" },
+		{ value: "de", label: "Deutsch" },
 	];
 	let availableThemes = $state<ThemeEntry[]>([]);
 	let themeOptions = $derived(
 		availableThemes.map((t: ThemeEntry) => ({
 			value: t.id,
 			label: t.name,
-			badge: [t.author, t.version ? `v${t.version}` : ""].filter(Boolean).join(" "),
+			badge: [t.author, t.version ? `v${t.version}` : ""]
+				.filter(Boolean)
+				.join(" "),
 		})),
 	);
 
