@@ -45,6 +45,7 @@ pub struct ForgeBatch {
     items: Vec<DownloadItemSpec>,
     profile_kind: ProfileKind,
     version_json_text: String,
+    java_path: Option<PathBuf>,
 }
 
 impl ForgeBatch {
@@ -53,6 +54,7 @@ impl ForgeBatch {
         game_version: &str,
         forge_version: &str,
         installer_url: &str,
+        java_path: Option<PathBuf>,
     ) -> Result<Self, AquaError> {
         let version_id = format!("{game_version}-forge-{forge_version}");
         let temp_dir = shared_dir
@@ -193,6 +195,7 @@ impl ForgeBatch {
             items,
             profile_kind,
             version_json_text,
+            java_path,
         })
     }
 
@@ -200,9 +203,10 @@ impl ForgeBatch {
         shared_dir: &Path,
         game_version: &str,
         forge_version: &str,
+        java_path: Option<PathBuf>,
     ) -> Result<VersionManifest, AquaError> {
         let installer_url = Self::resolve_installer_url(game_version, forge_version);
-        let batch = Self::new(shared_dir, game_version, forge_version, &installer_url).await?;
+        let batch = Self::new(shared_dir, game_version, forge_version, &installer_url, java_path).await?;
         batch.run(shared_dir).await
     }
 
@@ -296,7 +300,11 @@ impl DownloadBatch for ForgeBatch {
                 return Ok(());
             }
 
-            let java_path = find_java(&shared_dir)?;
+            let java_path = self.java_path.as_ref().ok_or_else(|| {
+                AquaError::JavaNotFound(
+                    "No Java runtime path was provided for Forge installation".into(),
+                )
+            })?;
             let staging_libs = staging_dir.join("libraries");
             let mc_jar = shared_dir
                 .join("versions")
@@ -374,7 +382,8 @@ impl DownloadBatch for ForgeBatch {
                         });
                     }
                 }
-                let classpath = cp_parts.join(":");
+                let separator = if cfg!(target_os = "windows") { ";" } else { ":" };
+                let classpath = cp_parts.join(separator);
 
                 let main_class = read_jar_main_class(&processor_jar)?;
 
@@ -744,24 +753,6 @@ fn resolve_var_refs(
         }
     }
     result
-}
-
-fn find_java(shared_dir: &Path) -> Result<PathBuf, AquaError> {
-    let candidates = [
-        shared_dir.join("runtimes/jre21/bin/java"),
-        shared_dir.join("runtimes/jre17/bin/java"),
-        shared_dir.join("runtimes/jre8/bin/java"),
-    ];
-
-    for candidate in &candidates {
-        if candidate.exists() {
-            return Ok(candidate.clone());
-        }
-    }
-
-    Err(AquaError::JavaNotFound(
-        "No Java runtime found in shared/runtimes/".into(),
-    ))
 }
 
 fn copy_dir_recursive(from: &Path, to: &Path) -> Result<(), AquaError> {

@@ -1,4 +1,5 @@
 use crate::core::path_manager::PathManager;
+use crate::services::java_manager::JavaManager;
 use crate::services::DownloadQueue;
 
 /// Install a Forge version. Downloads the installer, extracts, downloads libraries,
@@ -16,7 +17,12 @@ pub async fn install_forge(
         return Ok(version_id);
     }
 
-    let manifest = aqua::ForgeBatch::install(shared_dir, &game_version, &forge_version)
+    let java_path = [21u8, 17, 8]
+        .into_iter()
+        .find(|v| JavaManager::is_installed(*v))
+        .map(|v| JavaManager::get_java_binary(v));
+
+    let manifest = aqua::ForgeBatch::install(shared_dir, &game_version, &forge_version, java_path)
         .await
         .map_err(|e| format!("Forge installation failed: {e}"))?;
 

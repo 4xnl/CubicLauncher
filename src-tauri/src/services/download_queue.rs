@@ -1,5 +1,6 @@
 use crate::core::path_manager::PathManager;
 use crate::core::{AppEvent, emit};
+use crate::services::java_manager::JavaManager;
 use aqua::{DownloadManager, DownloadProgress, DownloadProgressType};
 use compact_str::CompactString;
 use dashmap::DashMap;
@@ -172,9 +173,14 @@ impl DownloadQueue {
                         }
                     }
 
+                    let java_path = [21u8, 17, 8]
+                        .into_iter()
+                        .find(|v| JavaManager::is_installed(*v))
+                        .map(|v| JavaManager::get_java_binary(v));
+
                     let installer_url =
                         aqua::ForgeBatch::resolve_installer_url(gv, fv);
-                    match aqua::ForgeBatch::new(&shared_dir, gv, fv, &installer_url).await {
+                    match aqua::ForgeBatch::new(&shared_dir, gv, fv, &installer_url, java_path).await {
                         Ok(batch) => match manager.prepare_batch(Box::new(batch)).await {
                             Ok(h) => h,
                             Err(e) => {
