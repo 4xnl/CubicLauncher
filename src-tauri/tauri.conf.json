@@ -141,7 +141,7 @@
 	},
 	"plugins": {
 		"updater": {
-			"pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDJGN0YxODA4NUU5QzVENDQKUldSRVhaeGVDQmgvTCtrbitjYmljOGV4dDZDdUV1bXQ5WVpQWWpEcm9ucTk5YU9iTkxYSDJxdnIK",
+			"pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEM2QkJCQ0JGMjc1NkRGOUQKUldTZDMxWW52N3k3eGt1NW1tYmRNVnNjSEtBdUp1Slh1SWV6ZFBibUtRR3BLR3c5Z0luQmJpZ0wK",
 			"endpoints": [
 				"https://github.com/CubicLauncher/CubicLauncher/releases/latest/download/latest.json",
 				"https://github.com/CubicLauncherDevs/CubicLauncher/releases/latest/download/latest.json"
