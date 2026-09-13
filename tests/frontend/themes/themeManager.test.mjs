@@ -30,9 +30,9 @@ plugin({
 });
 
 const { applyTheme, themeIcons, getThemeIcon, invalidateThemeCache } =
-	await import("../src/lib/api/themeManager.ts");
+	await import("../../../src/lib/api/themeManager.ts");
 const { themeDiagnostics } =
-	await import("../src/lib/state/themeDiagnostics.svelte.ts");
+	await import("../../../src/lib/state/themeDiagnostics.svelte.ts");
 
 let originals, spies, reads, deferreds, images, faces, registeredFonts;
 let nodes,

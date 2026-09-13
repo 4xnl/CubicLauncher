@@ -441,5 +441,5 @@ pub fn apply(instance: &Path, expected_revision: &str, action: ServerAction) -> 
 }
 
 #[cfg(test)]
-#[path = "server_manager_tests.rs"]
+#[path = "../tests/services/server_manager.rs"]
 mod tests;

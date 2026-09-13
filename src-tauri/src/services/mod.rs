@@ -11,6 +11,7 @@ pub(crate) mod java_manager;
 pub(crate) mod launcher;
 pub mod server_manager;
 #[cfg(test)]
+#[path = "../tests/services/server_performance.rs"]
 mod server_performance_tests;
 pub mod server_status;
 pub(crate) mod settings_manager;

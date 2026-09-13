@@ -32,6 +32,9 @@ jobs:
             - name: Type check
               run: bun run check
 
+            - name: Tests
+              run: bun run test:frontend
+
             - name: Build
               run: bun run build
 

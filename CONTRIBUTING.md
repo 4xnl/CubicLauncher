@@ -26,13 +26,21 @@ Siempre corré estos comandos antes de subir cambios:
 bun run lint       # ESLint + plugin Svelte
 bun run check      # svelte-check + TypeScript
 bun run format     # Prettier en src/
+bun run test:frontend
 
 # Backend (Rust)
 cd src-tauri
 cargo fmt --check
 cargo clippy -- -D warnings
 cd ..
+bun run test:rust
 ```
+
+Los tests frontend se agrupan por área en `tests/frontend/`. Los tests unitarios
+Rust están en `src/tests/` de cada crate, siguiendo la estructura de los módulos
+que verifican. Consultá [TESTING.md](TESTING.md) para agregar tests, ejecutar una
+suite específica o realizar las verificaciones manuales. `bun run test:all`
+ejecuta ambas suites desde la raíz.
 
 ## Convenciones de código
 

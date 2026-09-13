@@ -23,7 +23,7 @@
 ## Checklist
 
 - [ ] El codigo compila sin errores (`bun run build && cargo build`)
-- [ ] Los tests pasan (`cargo test`)
+- [ ] Los tests pasan (`bun run test:all`)
 - [ ] Se agregaron tests si es necesario
 - [ ] La documentacion fue actualizada si aplica
 - [ ] Se probo manualmente en las plataformas afectadas

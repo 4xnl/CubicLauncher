@@ -7,7 +7,7 @@ import { mock } from "bun:test";
 import { plugin, Transpiler } from "bun";
 import { compileModule } from "svelte/compiler";
 
-const lib = resolve(import.meta.dir, "../../src/lib");
+const lib = resolve(import.meta.dir, "../../../../src/lib");
 const transpiler = new Transpiler({ loader: "ts", target: "browser" });
 plugin({
 	name: "server-launch-runes",

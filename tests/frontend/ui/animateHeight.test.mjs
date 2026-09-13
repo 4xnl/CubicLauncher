@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, mock, test } from "bun:test";
-import { animateHeight } from "../src/lib/utils/animateHeight.ts";
+import { animateHeight } from "../../../src/lib/utils/animateHeight.ts";
 
 let originals,
 	node,

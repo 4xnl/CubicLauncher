@@ -5,6 +5,7 @@
 pub mod microsoft;
 pub mod storage;
 #[cfg(test)]
+#[path = "../tests/auth.rs"]
 mod tests;
 pub mod yggdrasil;
 

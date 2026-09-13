@@ -21,7 +21,7 @@ if (!chromium) {
 		name,
 		async () => {
 			const css = await readFile(
-				new URL("../src/styles/shared/perf.css", import.meta.url),
+				new URL("../../../src/styles/shared/perf.css", import.meta.url),
 				"utf8",
 			);
 			let server, browser, profile, watchdog;

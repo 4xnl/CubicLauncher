@@ -2,6 +2,77 @@
 
 Lista de verificaciones para correr antes de mergear una PR o antes de lanzar una release.
 
+## Organización de los tests
+
+```text
+tests/frontend/
+├── marketplace/       # Estado y selección del marketplace
+├── servers/           # API, cachés y recursos de servidores
+│   └── fixtures/      # Escenarios ejecutados en procesos aislados
+├── themes/            # Aplicación de temas y diagnósticos
+└── ui/                # Animaciones e iconos
+
+src-tauri/src/tests/
+├── commands/          # Avatares, idiomas, instancias e importación de temas
+├── core/              # Errores, rutas y ventanas WebView
+├── services/          # Descargas, instancias, servidores y mundos
+└── theme_watcher.rs   # Eventos y ciclo de vida del watcher
+
+crates/<crate>/src/tests/  # Tests de aqua, communicator, launchwerk y zellkern
+```
+
+### Convenciones
+
+- **Frontend:** agregar archivos `*.test.mjs` en el área correspondiente. Las
+  fixtures propias de una suite van en su subcarpeta `fixtures/`, sin el sufijo
+  `.test`, para evitar que Bun las ejecute como suites independientes.
+- **Rust:** ubicar los tests en `src/tests/` del crate, reflejando la ruta del
+  módulo de producción (por ejemplo, `services/instance_manager/handle.rs`).
+  Para los módulos definidos en `mod.rs`, usar el nombre del área como archivo,
+  como `tests/theme_watcher.rs`. Las suites con nombre propio pueden tener un
+  archivo descriptivo, como `tests/commands/themes/import.rs`.
+- Registrar cada suite Rust desde el módulo que verifica mediante
+  `#[cfg(test)]` y `#[path = "ruta/relativa/al/test.rs"]`. El archivo contiene
+  directamente los tests y puede usar `use super::*;`. Así mantiene acceso a
+  miembros privados y conserva los filtros existentes, como
+  `services::launcher::tests`. No hace falta un `mod tests` global en `lib.rs`.
+- Los doctests permanecen junto a la API que documentan. Los ejemplos de
+  `crates/*/examples/` se ejecutan con `cargo run -p <crate> --example <nombre>`.
+
+## Ejecutar tests
+
+Desde la raíz del repositorio:
+
+```bash
+bun run test:frontend  # Todas las suites Bun, con las condiciones de Svelte browser
+bun run test:rust      # cargo test --workspace, incluidos doctests
+bun run test:all       # Frontend y Rust
+
+# Una sola área o archivo frontend
+bun test --conditions=browser ./tests/frontend/themes
+bun test --conditions=browser ./tests/frontend/servers/servers.test.mjs
+
+# Un crate o módulo Rust; los filtros no dependen de la ubicación del archivo
+cargo test -p aqua
+cargo test -p cubiclauncher --lib services::launcher::tests
+```
+
+`ui/perfAnimations.test.mjs` usa Chromium/Chrome en modo headless. Busca
+`chromium`, `chromium-browser`, `google-chrome` o `google-chrome-stable` en `PATH`;
+si no encuentra ninguno, el test se marca como omitido. Los tests de manifiestos
+de `aqua` requieren conexión a Internet.
+
+Las mediciones sintéticas de rendimiento Rust están marcadas con `#[ignore]`
+y se ejecutan explícitamente:
+
+```bash
+cargo test -p cubiclauncher --lib world_performance_fixture -- --ignored --nocapture
+cargo test -p cubiclauncher --lib server_performance_fixture -- --ignored --nocapture --test-threads=1
+```
+
+CI ejecuta `bun run test:frontend` y `cargo test --workspace --verbose` en sus
+respectivos jobs, además de lint, tipos, formato, Clippy y build frontend.
+
 ## Checks automáticos (SIEMPRE)
 
 ```bash
@@ -9,15 +80,14 @@ Lista de verificaciones para correr antes de mergear una PR o antes de lanzar un
 bun install
 bun run lint
 bun run check
-bun test --conditions=browser
+bun run test:frontend
 bun run build
 
-# Rust
-cd src-tauri
-cargo fmt --check
-cargo clippy -- -D warnings
-cargo build --release
-cd ..
+# Rust (desde la raíz)
+cargo fmt --all --check
+cargo clippy --workspace -- -D warnings
+bun run test:rust
+cargo build --workspace --release
 ```
 
 ## Build completo de Tauri
@@ -66,7 +136,7 @@ bun run tauri build
 
 ### Servidores de las instancias
 
-- Ejecutar `cargo test -p cubiclauncher --lib server_`, `cargo test -p zellkern server_launch_tests` y `bun test --conditions=browser tests/servers.test.mjs tests/serverResources.test.mjs`.
+- Ejecutar `cargo test -p cubiclauncher --lib server_`, `cargo test -p zellkern server_launch_tests` y `bun test --conditions=browser ./tests/frontend/servers`.
 - Medición reproducible: `cargo test -p cubiclauncher --lib server_performance_fixture -- --ignored --nocapture --test-threads=1`. Genera listas de 50/500/1000 servidores con PNG de 32×32; mide carga de metadatos, iconos de la primera página, preparación de destinos y serialización IPC. Cuenta lecturas, decodificaciones, asignaciones Rust, pico/retención de heap y tiempo de CPU del hilo en Linux (`/proc/thread-self/schedstat`). El contador de asignaciones solo existe en tests.
 - [ ] Abrir Servidores en una instancia sin `servers.dat`; añadir, editar, reordenar y eliminar entradas, incluidas direcciones duplicadas. Comprobar la lista dentro de Minecraft.
 - [ ] Probar Preguntar/Aceptar/Rechazar paquetes de recursos y comprobar que se conservan iconos y campos de mods al editar nombres.
@@ -133,7 +203,7 @@ La comparación anterior cargaba/decodificaba la lista completa dos veces (lectu
 
 ### Modpacks y themes
 
-- Ejecutar `bun test --conditions=browser tests/themeManager.test.mjs tests/themeDiagnostics.test.mjs` y `cargo test -p cubiclauncher --lib theme` para comprobar cargas concurrentes, limpieza de recursos, avisos, importacion con rollback, watcher y cache de tema activo.
+- Ejecutar `bun test --conditions=browser ./tests/frontend/themes` y `cargo test -p cubiclauncher --lib theme` para comprobar cargas concurrentes, limpieza de recursos, avisos, importacion con rollback, watcher y cache de tema activo.
 - [ ] Arrastrar un `.mrpack` o `.zip` al launcher e importarlo.
 - [ ] Cambiar de tema y verificar que apliquen las variables CSS.
 - [ ] Importar un theme `.zip` o `.cbth`.

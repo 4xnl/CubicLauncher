@@ -550,5 +550,5 @@ pub fn import_world(source: &Path, saves: &Path, progress: &mut Progress<'_>) ->
 }
 
 #[cfg(test)]
-#[path = "world_manager_tests.rs"]
+#[path = "../tests/services/world_manager.rs"]
 mod tests;

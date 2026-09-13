@@ -26,7 +26,7 @@ plugin({
 });
 
 const { themeDiagnostics, setThemeDiagnostics, setThemeBackgroundDimensions } =
-	await import("../src/lib/state/themeDiagnostics.svelte.ts");
+	await import("../../../src/lib/state/themeDiagnostics.svelte.ts");
 
 function theme(overrides = {}) {
 	return {
@@ -227,7 +227,7 @@ test("bundled translations provide matching diagnostic keys and placeholders", a
 				JSON.parse(
 					await readFile(
 						new URL(
-							`../src/lib/i18n/${locale}.json`,
+							`../../../src/lib/i18n/${locale}.json`,
 							import.meta.url,
 						),
 						"utf8",

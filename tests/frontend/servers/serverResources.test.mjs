@@ -2,7 +2,7 @@ import { expect, mock, test } from "bun:test";
 import {
 	ResourceCache,
 	ServerResources,
-} from "../src/lib/state/serverResources.ts";
+} from "../../../src/lib/state/serverResources.ts";
 
 const row = (index, overrides = {}) => ({
 	index,

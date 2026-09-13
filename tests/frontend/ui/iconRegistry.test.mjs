@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { isRasterIcon } from "../src/lib/icons/registry.ts";
+import { isRasterIcon } from "../../../src/lib/icons/registry.ts";
 
 for (const extension of ["png", "webp", "jpg", "jpeg", "PNG"]) {
 	for (const suffix of [

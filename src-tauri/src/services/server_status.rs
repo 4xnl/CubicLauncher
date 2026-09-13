@@ -542,5 +542,5 @@ async fn exchange(
 }
 
 #[cfg(test)]
-#[path = "server_status_tests.rs"]
+#[path = "../tests/services/server_status.rs"]
 mod tests;

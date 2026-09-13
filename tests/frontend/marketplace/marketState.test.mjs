@@ -8,7 +8,7 @@ import { effect_root } from "svelte/internal/client";
 
 // Bun strips types before Svelte compiles runes; browser conditions select the
 // client runtime, so effects can run without a DOM or a mounted component.
-const lib = resolve(import.meta.dir, "../src/lib");
+const lib = resolve(import.meta.dir, "../../../src/lib");
 const transpiler = new Transpiler({ loader: "ts", target: "browser" });
 plugin({
 	name: "market-state-runes",
@@ -157,10 +157,10 @@ mock.module(`${lib}/state/state.svelte`, () => ({ showWarning: mock() }));
 mock.module(`${lib}/i18n`, () => ({ t: (key) => key }));
 
 const { createMarketState } =
-	await import("../src/lib/state/marketState.svelte.ts");
+	await import("../../../src/lib/state/marketState.svelte.ts");
 const { getMarketProjectId, localModToMarket } =
-	await import("../src/lib/types/market");
-const { InstState } = await import("../src/lib/types/types");
+	await import("../../../src/lib/types/market");
+const { InstState } = await import("../../../src/lib/types/types");
 const instance = {
 	uuid: "instance",
 	name: "Test",

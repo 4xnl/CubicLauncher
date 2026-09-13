@@ -4,7 +4,7 @@ import {
 	getInstanceServerIcons,
 	serverAction,
 	pingInstanceServers,
-} from "../src/lib/api/servers.ts";
+} from "../../../src/lib/api/servers.ts";
 import { resolve } from "node:path";
 
 let originalWindow, invoke, starts;

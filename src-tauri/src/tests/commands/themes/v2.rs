@@ -1,0 +1,401 @@
+use super::*;
+
+fn build_theme_meta(name: &str) -> ThemeMeta {
+    ThemeMeta {
+        name: CompactString::new(name),
+        author: CompactString::new("TestAuthor"),
+        version: CompactString::new("1.0"),
+        description: CompactString::new("Test description"),
+        injects_css: false,
+    }
+}
+
+fn build_theme_def() -> ThemeDef {
+    let mut colors = HashMap::new();
+    colors.insert("accent".into(), "#ff0000".into());
+    colors.insert("accent-rgb".into(), "255, 0, 0".into());
+
+    let mut text = HashMap::new();
+    text.insert("primary".into(), "#ffffff".into());
+
+    let mut borders = HashMap::new();
+    borders.insert("color".into(), "#333333".into());
+    borders.insert("radius".into(), "8px".into());
+
+    let mut shadows = HashMap::new();
+    shadows.insert("shadow-sm".into(), "0 1px 3px rgba(0,0,0,0.5)".into());
+    shadows.insert("glow-accent".into(), "0 0 12px rgba(255,0,0,0.3)".into());
+
+    let mut others = HashMap::new();
+    others.insert("icon-filter".into(), "invert(1)".into());
+
+    let mut ui = HashMap::new();
+    ui.insert("play".into(), "ui/play.svg".into());
+    let icons = Icons {
+        preview: Some("preview.png".into()),
+        groups: {
+            let mut groups = HashMap::new();
+            groups.insert("ui".into(), ui);
+            groups
+        },
+    };
+
+    ThemeDef {
+        colors,
+        background: Background {
+            reference_path: Some("bg.webp".into()),
+            image_blur: Some(10.0),
+            image_opacity: Some(0.5),
+        },
+        text,
+        fonts: vec![],
+        icons,
+        layout: HashMap::new(),
+        borders,
+        shadows,
+        backgrounds: HashMap::new(),
+        backdrop: HashMap::new(),
+        others,
+    }
+}
+
+#[test]
+fn parse_v2_theme_from_toml() {
+    let toml_str = r##"
+            [meta]
+            name = "Test Theme"
+            author = "Author"
+            version = "2.0"
+            description = "A test"
+            injects_css = true
+
+            [theme.background]
+            reference_path = "image.png"
+            image_blur = 5.0
+            image_opacity = 0.8
+
+            [theme.colors]
+            accent = "#abc123"
+
+            [theme.text]
+            primary = "#000000"
+
+            [theme.icons]
+            preview = "preview.png"
+
+            [theme.icons.ui]
+            play = "ui/play.svg"
+        "##;
+
+    let theme: V2Theme = toml::from_str(toml_str).expect("failed to parse TOML");
+    assert_eq!(theme.meta.name.as_str(), "Test Theme");
+    assert_eq!(theme.meta.author.as_str(), "Author");
+    assert!(theme.meta.injects_css);
+    assert_eq!(theme.theme.colors.get("accent").unwrap(), "#abc123");
+    assert_eq!(theme.theme.text.get("primary").unwrap(), "#000000");
+    assert_eq!(
+        theme.theme.background.reference_path.as_deref(),
+        Some("image.png")
+    );
+    assert_eq!(theme.theme.icons.preview.as_deref(), Some("preview.png"));
+    assert_eq!(
+        theme
+            .theme
+            .icons
+            .groups
+            .get("ui")
+            .and_then(|g| g.get("play"))
+            .map(String::as_str),
+        Some("ui/play.svg")
+    );
+}
+
+#[test]
+fn parse_minimal_theme() {
+    let toml_str = r##"
+            [meta]
+            name = "Minimal"
+
+            [theme.background]
+        "##;
+
+    let theme: V2Theme = toml::from_str(toml_str).expect("failed to parse minimal TOML");
+    assert_eq!(theme.meta.name.as_str(), "Minimal");
+    assert!(theme.meta.author.is_empty());
+    assert!(theme.meta.version.is_empty());
+    assert!(!theme.meta.injects_css);
+    assert!(theme.theme.background.reference_path.is_none());
+}
+
+#[test]
+fn flatten_colors_prefix() {
+    let mut theme = build_theme_def();
+    theme.text.clear();
+    theme.borders.clear();
+    theme.shadows.clear();
+    theme.others.clear();
+
+    let vars = flatten_variables(&theme);
+    assert_eq!(vars.get("--accent").unwrap(), "#ff0000");
+    assert_eq!(vars.get("--accent-rgb").unwrap(), "255, 0, 0");
+}
+
+#[test]
+fn flatten_text_prefix() {
+    let mut theme = build_theme_def();
+    theme.colors.clear();
+    theme.borders.clear();
+    theme.shadows.clear();
+    theme.others.clear();
+
+    let vars = flatten_variables(&theme);
+    assert_eq!(vars.get("--text-primary").unwrap(), "#ffffff");
+}
+
+#[test]
+fn flatten_borders_prefix() {
+    let mut theme = build_theme_def();
+    theme.colors.clear();
+    theme.text.clear();
+    theme.shadows.clear();
+    theme.others.clear();
+
+    let vars = flatten_variables(&theme);
+    assert_eq!(vars.get("--border-color").unwrap(), "#333333");
+    assert_eq!(vars.get("--border-radius").unwrap(), "8px");
+}
+
+#[test]
+fn flatten_shadows_no_prefix() {
+    let mut theme = build_theme_def();
+    theme.colors.clear();
+    theme.text.clear();
+    theme.borders.clear();
+    theme.others.clear();
+
+    let vars = flatten_variables(&theme);
+    assert_eq!(
+        vars.get("--shadow-sm").unwrap(),
+        "0 1px 3px rgba(0,0,0,0.5)"
+    );
+    assert_eq!(
+        vars.get("--glow-accent").unwrap(),
+        "0 0 12px rgba(255,0,0,0.3)"
+    );
+}
+
+#[test]
+fn flatten_others_no_prefix() {
+    let mut theme = build_theme_def();
+    theme.colors.clear();
+    theme.text.clear();
+    theme.borders.clear();
+    theme.shadows.clear();
+
+    let vars = flatten_variables(&theme);
+    assert_eq!(vars.get("--icon-filter").unwrap(), "invert(1)");
+}
+
+#[test]
+fn flatten_background_fields() {
+    let theme = build_theme_def();
+    let vars = flatten_variables(&theme);
+    assert!(
+        !vars.contains_key("--bg-image-path"),
+        "background fields should NOT be in variables (exposed via ThemeResponse fields)"
+    );
+    assert!(!vars.contains_key("--bg-image-blur"));
+    assert!(!vars.contains_key("--bg-image-opacity"));
+}
+
+#[test]
+fn flatten_background_none() {
+    let mut theme = build_theme_def();
+    theme.background = Background {
+        reference_path: None,
+        image_blur: None,
+        image_opacity: None,
+    };
+
+    let vars = flatten_variables(&theme);
+    assert!(!vars.contains_key("--bg-image-path"));
+    assert!(!vars.contains_key("--bg-image-blur"));
+    assert!(!vars.contains_key("--bg-image-opacity"));
+}
+
+#[test]
+fn flatten_backgrounds_prefix() {
+    let mut theme = build_theme_def();
+    theme.colors.clear();
+    theme.text.clear();
+    theme.borders.clear();
+    theme.shadows.clear();
+    theme.others.clear();
+    theme.backgrounds.insert("main".into(), "#000000".into());
+    theme.backgrounds.insert("card".into(), "#111111".into());
+
+    let vars = flatten_variables(&theme);
+    assert_eq!(vars.get("--bg-main").unwrap(), "#000000");
+    assert_eq!(vars.get("--bg-card").unwrap(), "#111111");
+}
+
+#[test]
+fn flatten_backdrop_prefix_and_px() {
+    let mut theme = build_theme_def();
+    theme.colors.clear();
+    theme.text.clear();
+    theme.borders.clear();
+    theme.shadows.clear();
+    theme.others.clear();
+    theme.backdrop.insert("dropdown".into(), 10.0);
+    theme.backdrop.insert("modal".into(), 4.0);
+
+    let vars = flatten_variables(&theme);
+    assert_eq!(vars.get("--backdrop-blur-dropdown").unwrap(), "10px");
+    assert_eq!(vars.get("--backdrop-blur-modal").unwrap(), "4px");
+}
+
+#[test]
+fn flatten_empty_sections() {
+    let theme = ThemeDef {
+        colors: HashMap::new(),
+        background: Background {
+            reference_path: None,
+            image_blur: None,
+            image_opacity: None,
+        },
+        text: HashMap::new(),
+        fonts: vec![],
+        icons: Icons::default(),
+        layout: HashMap::new(),
+        borders: HashMap::new(),
+        shadows: HashMap::new(),
+        backgrounds: HashMap::new(),
+        backdrop: HashMap::new(),
+        others: HashMap::new(),
+    };
+
+    let vars = flatten_variables(&theme);
+    assert!(vars.is_empty());
+}
+
+#[test]
+fn trait_getters() {
+    let v2 = V2Theme {
+        meta: build_theme_meta("MyTheme"),
+        theme: build_theme_def(),
+    };
+
+    assert_eq!(v2.get_name().as_str(), "MyTheme");
+    assert_eq!(v2.get_author().as_str(), "testauthor");
+    assert_eq!(v2.get_version().as_str(), "1.0");
+}
+
+#[test]
+fn collect_icons_preview_and_groups() {
+    let mut ui = HashMap::new();
+    ui.insert("play".into(), "ui/play.svg".into());
+    ui.insert("trash".into(), "ui/trash.svg".into());
+
+    let mut nav = HashMap::new();
+    nav.insert("settings".into(), "nav/settings.svg".into());
+
+    let icons = Icons {
+        preview: Some("preview.png".into()),
+        groups: {
+            let mut groups = HashMap::new();
+            groups.insert("ui".into(), ui);
+            groups.insert("nav".into(), nav);
+            groups
+        },
+    };
+
+    let collected = collect_icons(&icons);
+    assert_eq!(collected.len(), 4);
+    assert_eq!(
+        collected.get("preview").map(String::as_str),
+        Some("preview.png")
+    );
+    assert_eq!(
+        collected.get("ui:play").map(String::as_str),
+        Some("ui/play.svg")
+    );
+    assert_eq!(
+        collected.get("ui:trash").map(String::as_str),
+        Some("ui/trash.svg")
+    );
+    assert_eq!(
+        collected.get("nav:settings").map(String::as_str),
+        Some("nav/settings.svg")
+    );
+}
+
+#[test]
+fn collect_icons_empty() {
+    let icons = Icons::default();
+    let collected = collect_icons(&icons);
+    assert!(collected.is_empty());
+}
+
+#[test]
+fn collect_icons_only_preview() {
+    let icons = Icons {
+        preview: Some("icon.png".into()),
+        groups: HashMap::new(),
+    };
+    let collected = collect_icons(&icons);
+    assert_eq!(collected.len(), 1);
+    assert_eq!(
+        collected.get("preview").map(String::as_str),
+        Some("icon.png")
+    );
+}
+
+#[test]
+fn collect_icons_only_groups() {
+    let mut group = HashMap::new();
+    group.insert("puzzle".into(), "instance/puzzle.svg".into());
+
+    let icons = Icons {
+        preview: None,
+        groups: {
+            let mut groups = HashMap::new();
+            groups.insert("instance".into(), group);
+            groups
+        },
+    };
+
+    let collected = collect_icons(&icons);
+    assert_eq!(collected.len(), 1);
+    assert_eq!(
+        collected.get("instance:puzzle").map(String::as_str),
+        Some("instance/puzzle.svg")
+    );
+}
+
+#[test]
+fn to_theme_res_fields() {
+    let v2 = V2Theme {
+        meta: build_theme_meta("ResTheme"),
+        theme: build_theme_def(),
+    };
+
+    let res = v2.to_theme_res();
+    assert_eq!(res.name, "ResTheme");
+    assert_eq!(res.author, "testauthor");
+    assert_eq!(res.version, "1.0");
+    assert_eq!(res.r#type, "user");
+    assert!(res.variables.contains_key("--accent"));
+    assert_eq!(res.bg_image.as_deref(), Some("bg.webp"));
+    assert_eq!(res.bg_image_blur, Some(10.0));
+    assert_eq!(res.bg_image_opacity, Some(0.5));
+    assert_eq!(
+        res.icons.get("preview").map(String::as_str),
+        Some("preview.png")
+    );
+    assert_eq!(
+        res.icons.get("ui:play").map(String::as_str),
+        Some("ui/play.svg")
+    );
+    assert!(res.inject_css.is_none());
+}
