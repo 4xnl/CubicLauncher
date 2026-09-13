@@ -40,8 +40,7 @@ if (!chromium) {
   display: inline-block; animation: spin 80ms linear infinite;
 }
 .spinner::before, .spinner::after { content: "spin"; }
-</style><style>${css}</style><main></main><pre id="result"></pre>
-<img hidden src="/hold-load" alt="">
+</style><style>${css}</style><main></main>
 <script>
 (async () => {
   const results = [];
@@ -61,6 +60,7 @@ if (!chromium) {
         iterations: style.animationIterationCount }];
     }));
   };
+  let payload;
   try {
     for (const [noInfinite, reduceMotion] of [[false, false], [true, false], [true, true], [false, false]]) {
       for (const [attr, enabled] of [['data-no-infinite-animations', noInfinite], ['data-reduce-motion', reduceMotion]]) {
@@ -73,32 +73,39 @@ if (!chromium) {
       await new Promise(resolve => setTimeout(resolve, 300));
       results.push({ noInfinite, reduceMotion, initial, final: sample() });
     }
-    document.querySelector('#result').textContent = btoa(JSON.stringify({ results }));
+    payload = { results };
   } catch (error) {
-    document.querySelector('#result').textContent = btoa(JSON.stringify({ error: String(error) }));
-  } finally {
-    await fetch('/done', { method: 'POST' });
+    payload = { error: String(error) };
   }
+  await fetch('/result', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
 })();
 </script>`;
-				// Hold page load until sampling finishes: virtual time does not reliably tick CSS animations.
-				let releaseLoad;
-				const loadGate = new Promise((resolve) => {
-					releaseLoad = resolve;
+				// Let the page load normally and report after real-time CSS sampling.
+				// --dump-dom plus a pending load can stall headless rendering indefinitely.
+				let reportResult, rejectResult;
+				const result = new Promise((resolve, reject) => {
+					reportResult = resolve;
+					rejectResult = reject;
 				});
+				let pageRequested = false;
 				server = Bun.serve({
 					hostname: "127.0.0.1",
 					port: 0,
 					async fetch(request) {
 						const path = new URL(request.url).pathname;
-						if (path === "/done") {
-							releaseLoad();
+						if (path === "/result" && request.method === "POST") {
+							try {
+								reportResult(await request.json());
+							} catch (error) {
+								rejectResult(error);
+								return new Response(null, { status: 400 });
+							}
 							return new Response(null, { status: 204 });
 						}
-						if (path === "/hold-load") {
-							await loadGate;
-							return new Response(null, { status: 204 });
+						if (path !== "/") {
+							return new Response(null, { status: 404 });
 						}
+						pageRequested = true;
 						return new Response(html, {
 							headers: {
 								"Content-Type": "text/html; charset=utf-8",
@@ -121,31 +128,31 @@ if (!chromium) {
 						"--disable-component-update",
 						"--disable-sync",
 						"--disable-extensions",
+						"--disable-background-timer-throttling",
+						"--disable-renderer-backgrounding",
 						"--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1",
 						"--run-all-compositor-stages-before-draw",
-						"--dump-dom",
+						"--remote-debugging-port=0",
 						`--user-data-dir=${profile}`,
 						`http://127.0.0.1:${server.port}/`,
 					],
-					{ stdout: "pipe", stderr: "pipe" },
+					{ stdout: "ignore", stderr: "pipe" },
 				);
-				watchdog = setTimeout(() => browser.kill("SIGKILL"), 20_000);
-				const [stdout, stderr, exitCode] = await Promise.all([
-					new Response(browser.stdout).text(),
-					new Response(browser.stderr).text(),
-					browser.exited,
+				const stderr = new Response(browser.stderr).text();
+				let timedOut = false;
+				watchdog = setTimeout(() => {
+					timedOut = true;
+					browser.kill("SIGKILL");
+				}, 20_000);
+				const payload = await Promise.race([
+					result,
+					browser.exited.then(async (exitCode) => {
+						throw new Error(
+							`${timedOut ? "Chromium timed out waiting for animation results" : `Chromium exited before reporting animation results (code ${exitCode})`}; page requested: ${pageRequested}\n${await stderr}`,
+						);
+					}),
 				]);
-				expect(exitCode, `Chromium failed: ${stderr}`).toBe(0);
-				const encoded = stdout.match(
-					/<pre\b[^>]*\bid="result"[^>]*>\s*([A-Za-z0-9+/=]+)\s*<\/pre>/,
-				)?.[1];
-				expect(
-					encoded,
-					`Missing fixture result: ${stdout}\n${stderr}`,
-				).toBeTruthy();
-				const payload = JSON.parse(
-					Buffer.from(encoded, "base64").toString("utf8"),
-				);
+				clearTimeout(watchdog);
 				expect(payload.error).toBeUndefined();
 				expect(payload.results).toHaveLength(4);
 				for (const phase of payload.results) {
