@@ -2,6 +2,7 @@
 	import { t } from "$lib/i18n";
 	import type { MarketProject } from "$lib/types/market";
 	import Loading from "$lib/icons/Loading.svelte";
+	import Icon from "$lib/icons/Icon.svelte";
 	import CubicLogo from "./CubicLogo.svelte";
 
 	interface Props {
@@ -50,7 +51,7 @@
 			case "modrinth":
 				return "Modrinth";
 			case "curseforge":
-				return "CF";
+				return "CurseForge";
 			case "local":
 				return t("market.item.local");
 			default:
@@ -59,79 +60,93 @@
 	});
 </script>
 
-<!-- svelte-ignore a11y_click_events_have_key_events -->
-<!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
 	class="market-item"
 	class:selected
 	class:disabled={project.disabled}
 	class:incompatible
-	onclick={onSelect}
 >
-	<div class="market-item-icon">
-		{#if project.icon && !iconError}
-			<img
-				src={project.icon}
-				alt={project.title}
-				loading="lazy"
-				decoding="async"
-				onerror={() => (iconError = true)}
-			/>
-		{:else}
-			<CubicLogo />
-		{/if}
-	</div>
-
-	<div class="market-item-body">
-		<div class="market-item-header">
-			<h4 class="market-item-title" title={project.title}>
-				{project.title}
-			</h4>
-			<div class="market-item-badges">
-				{#if statusLabel}
-					<span class="market-item-badge update">
-						{statusLabel}
-					</span>
-				{/if}
-				{#if sourceLabel}
-					<span class="market-item-badge {project.source}">
-						{sourceLabel}
-					</span>
-				{/if}
-				{#if incompatible}
-					<span class="market-item-badge incompatible">
-						{t("market.item.incompatible")}
-					</span>
-				{/if}
-			</div>
-		</div>
-
-		<span class="market-item-author">
-			{t("market.item.by")}
-			{project.author || t("market.item.unknownAuthor")}
+	<button
+		type="button"
+		class="market-item-open"
+		onclick={onSelect}
+		aria-label={project.title}
+	>
+		<span class="market-item-icon">
+			{#if project.icon && !iconError}
+				<img
+					src={project.icon}
+					alt={project.title}
+					loading="lazy"
+					decoding="async"
+					onerror={() => (iconError = true)}
+				/>
+			{:else}
+				<CubicLogo />
+			{/if}
 		</span>
 
-		<p class="market-item-description" title={project.description}>
+		<span class="market-item-body">
+			<span class="market-item-header">
+				<span class="market-item-title" title={project.title}>
+					{project.title}
+				</span>
+				{#if statusLabel || incompatible}
+					<span class="market-item-badges">
+						{#if statusLabel}
+							<span class="market-item-badge update">
+								{statusLabel}
+							</span>
+						{/if}
+						{#if incompatible}
+							<span class="market-item-badge incompatible">
+								{t("market.item.incompatible")}
+							</span>
+						{/if}
+					</span>
+				{/if}
+			</span>
+
+			<span class="market-item-author">
+				{t("market.item.by")}
+				{project.author || t("market.item.unknownAuthor")}
+			</span>
+		</span>
+		<span class="market-item-description" title={project.description}>
 			{project.description || t("market.item.noDescription")}
-		</p>
-	</div>
+		</span>
+	</button>
 
 	<div class="market-item-actions">
-		{#if project.downloadCount > 0}
-			<span class="market-item-downloads">
-				↓ {formatNumber(project.downloadCount)}
-			</span>
-		{/if}
+		<div class="market-item-meta">
+			{#if sourceLabel}
+				<span class="market-item-source">{sourceLabel}</span>
+			{/if}
+			{#if project.downloadCount > 0}
+				<span
+					class="market-item-downloads"
+					title={`${t("market.detail.downloads")}: ${project.downloadCount.toLocaleString()}`}
+				>
+					<Icon name="ui:download" size={12} />{formatNumber(
+						project.downloadCount,
+					)}
+				</span>
+			{/if}
+		</div>
 
 		{#if project.installed}
 			<span class="market-item-installed-badge"
-				>{t("market.item.installed")}</span
+				><Icon name="ui:check" size={12} />{t(
+					"market.item.installed",
+				)}</span
 			>
 		{:else if onInstall}
 			<button
 				type="button"
 				class="market-item-install-btn"
 				disabled={installing}
+				aria-label={`${t("market.item.install")} ${project.title}`}
+				aria-busy={installing}
 				onclick={handleInstall}
 			>
 				{#if installing}
@@ -147,26 +162,55 @@
 <style>
 	.market-item {
 		display: flex;
+		flex-direction: column;
 		align-items: stretch;
-		gap: 14px;
-		padding: 12px 14px;
-		background: rgba(255, 255, 255, 0.02);
+		gap: 12px;
+		padding: 14px;
+		background: var(--surface-selected);
 		border: 1px solid var(--border);
 		border-radius: var(--border-radius-sm);
-		cursor: pointer;
-		transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
-		min-height: 90px;
+		transition:
+			border-color 0.15s ease,
+			background-color 0.15s ease;
+		height: 100%;
+		min-width: 0;
 		box-sizing: border-box;
 	}
 
-	.market-item:hover {
-		background: rgba(255, 255, 255, 0.04);
-		border-color: rgba(255, 255, 255, 0.15);
+	.market-item:hover,
+	.market-item:focus-within {
+		background: var(--surface-active);
+		border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+	}
+
+	.market-item-open {
+		display: grid;
+		grid-template-columns: 48px minmax(0, 1fr);
+		grid-template-rows: auto 1fr;
+		align-items: start;
+		gap: 10px;
+		flex: 1;
+		min-height: 0;
+		min-width: 0;
+		padding: 0;
+		border: none;
+		background: transparent;
+		color: inherit;
+		font: inherit;
+		text-align: start;
+		cursor: pointer;
+		border-radius: var(--border-radius-sm);
+	}
+
+	.market-item-open:focus-visible,
+	.market-item-install-btn:focus-visible {
+		outline: 2px solid var(--accent);
+		outline-offset: 4px;
 	}
 
 	.market-item.selected {
 		border-color: var(--accent);
-		background: rgba(255, 255, 255, 0.04);
+		background: var(--bg-card-gradient), var(--surface-selected);
 	}
 
 	.market-item.disabled {
@@ -179,24 +223,23 @@
 	}
 
 	.market-item-icon {
-		width: 56px;
-		height: 56px;
+		width: 48px;
+		height: 48px;
 		border-radius: var(--border-radius-sm);
-		background: rgba(255, 255, 255, 0.03);
+		background: var(--surface-selected);
 		border: 1px solid var(--border);
 		overflow: hidden;
 		flex-shrink: 0;
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		align-self: center;
+		align-self: flex-start;
 	}
 
 	.market-item-icon img {
 		width: 100%;
 		height: 100%;
-		object-fit: cover;
-		image-rendering: pixelated;
+		object-fit: contain;
 	}
 
 	.market-item-body {
@@ -204,27 +247,31 @@
 		min-width: 0;
 		display: flex;
 		flex-direction: column;
-		justify-content: center;
-		gap: 3px;
+		justify-content: flex-start;
+		gap: 6px;
 		overflow: hidden;
 	}
 
 	.market-item-header {
 		display: flex;
-		align-items: center;
-		gap: 8px;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 6px;
 		min-width: 0;
 	}
 
 	.market-item-title {
-		font-size: 0.86rem;
+		font-size: 0.9rem;
 		font-weight: 700;
 		color: var(--text-primary);
 		margin: 0;
-		white-space: nowrap;
+		display: -webkit-box;
+		-webkit-line-clamp: 2;
+		line-clamp: 2;
+		-webkit-box-orient: vertical;
+		line-height: 1.3;
 		overflow: hidden;
 		text-overflow: ellipsis;
-		flex: 1;
 		min-width: 0;
 	}
 
@@ -232,6 +279,7 @@
 		display: flex;
 		align-items: center;
 		gap: 4px;
+		flex-wrap: wrap;
 		flex-shrink: 0;
 	}
 
@@ -247,35 +295,14 @@
 
 	.market-item-badge.update {
 		color: var(--accent);
-		background: rgba(var(--accent-rgb, 255 255 255) / 0.1);
-		border: 1px solid rgba(var(--accent-rgb, 255 255 255) / 0.3);
+		background: color-mix(in srgb, var(--accent) 10%, transparent);
+		border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
 	}
 
 	.market-item-badge.incompatible {
 		color: var(--color-error);
 		background: rgba(var(--color-error-rgb), 0.08);
 		border: 1px solid rgba(var(--color-error-rgb), 0.2);
-	}
-
-	.market-item-badge.modrinth {
-		color: #4ade80;
-		background: rgba(74, 222, 128, 0.08);
-		border: 1px solid rgba(74, 222, 128, 0.22);
-		font-size: 0.55rem;
-	}
-
-	.market-item-badge.curseforge {
-		color: #fb923c;
-		background: rgba(251, 146, 60, 0.08);
-		border: 1px solid rgba(251, 146, 60, 0.22);
-		font-size: 0.55rem;
-	}
-
-	.market-item-badge.local {
-		color: var(--text-primary);
-		background: rgba(255, 255, 255, 0.06);
-		border: 1px solid var(--border);
-		font-size: 0.55rem;
 	}
 
 	.market-item-author {
@@ -287,10 +314,15 @@
 	}
 
 	.market-item-description {
+		grid-column: 1 / -1;
+		min-height: 0;
 		font-size: 0.75rem;
-		color: var(--text-secondary);
-		line-height: 1.35;
-		white-space: nowrap;
+		color: var(--text-tertiary, var(--text-secondary));
+		line-height: 1.5;
+		display: -webkit-box;
+		-webkit-line-clamp: 2;
+		line-clamp: 2;
+		-webkit-box-orient: vertical;
 		overflow: hidden;
 		text-overflow: ellipsis;
 		margin: 0;
@@ -298,20 +330,35 @@
 
 	.market-item-actions {
 		display: flex;
-		flex-direction: column;
-		align-items: flex-end;
-		justify-content: center;
+		align-items: center;
+		justify-content: space-between;
+		min-height: 28px;
 		gap: 6px;
 		flex-shrink: 0;
+		padding-top: 10px;
+		border-top: 1px solid var(--border);
+	}
+
+	.market-item-meta {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 4px 10px;
+		min-width: 0;
+	}
+
+	.market-item-source {
+		font-size: 0.65rem;
+		color: var(--text-tertiary, var(--text-secondary));
 	}
 
 	.market-item-downloads {
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
 		font-size: 0.7rem;
 		color: var(--text-secondary);
-		background: rgba(255, 255, 255, 0.04);
-		border: 1px solid var(--border);
-		padding: 2px 7px;
-		border-radius: var(--border-radius-sm);
+		font-variant-numeric: tabular-nums;
 		white-space: nowrap;
 	}
 
@@ -321,20 +368,23 @@
 		justify-content: center;
 		gap: 6px;
 		padding: 5px 12px;
-		background: var(--accent);
-		color: var(--bg-main);
-		border: none;
+		background: var(--surface-input);
+		color: var(--text-primary);
+		border: 1px solid var(--border);
 		border-radius: var(--border-radius-sm);
 		cursor: pointer;
 		font-size: 0.72rem;
 		font-weight: 700;
 		letter-spacing: 0.3px;
-		transition: filter 0.15s;
+		transition:
+			background-color 0.15s,
+			color 0.15s;
 		white-space: nowrap;
 	}
 
 	.market-item-install-btn:hover:not(:disabled) {
-		filter: brightness(0.9);
+		background: var(--accent);
+		color: var(--accent-text);
 	}
 
 	.market-item-install-btn:disabled {
@@ -343,6 +393,9 @@
 	}
 
 	.market-item-installed-badge {
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
 		font-size: 0.62rem;
 		font-weight: 700;
 		text-transform: uppercase;
@@ -358,5 +411,11 @@
 	:global(.item-install-spinner) {
 		width: 14px;
 		height: 14px;
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.market-item,
+		.market-item-install-btn {
+			transition: none;
+		}
 	}
 </style>

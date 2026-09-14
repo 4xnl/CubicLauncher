@@ -9,6 +9,7 @@ pub mod instance;
 pub mod java;
 pub mod log_window;
 pub mod market;
+pub mod market_requests;
 pub mod modrinth;
 pub mod neoforge;
 pub mod others;

@@ -1,17 +1,11 @@
-use std::collections::HashMap;
-use std::sync::LazyLock;
-use std::time::{Duration, Instant};
-
-use parking_lot::Mutex;
+use crate::core::json_cache::JsonCache;
 use serde::{Deserialize, Serialize};
+use std::sync::{Arc, LazyLock};
 
 use crate::core::http_client::HTTP;
 
 const CURSEFORGE_API_BASE: &str = "https://api.curseforge.com/v1";
 const MINECRAFT_GAME_ID: u32 = 432;
-
-const CACHE_TTL: Duration = Duration::from_secs(300);
-const CACHE_MAX: usize = 200;
 
 pub const MODS_CLASS_ID: u32 = 6;
 pub const MODPACKS_CLASS_ID: u32 = 4471;
@@ -309,50 +303,7 @@ impl From<CurseForgeError> for String {
     }
 }
 
-struct CacheEntry {
-    data: serde_json::Value,
-    fetched_at: Instant,
-}
-
-struct ApiCache {
-    entries: Mutex<HashMap<String, CacheEntry>>,
-}
-
-impl ApiCache {
-    fn get(&self, key: &str) -> Option<serde_json::Value> {
-        let mut map = self.entries.lock();
-        if let Some(entry) = map.get(key) {
-            if entry.fetched_at.elapsed() < CACHE_TTL {
-                return Some(entry.data.clone());
-            }
-            map.remove(key);
-        }
-        None
-    }
-
-    fn set(&self, key: String, data: serde_json::Value) {
-        let mut map = self.entries.lock();
-        if map.len() >= CACHE_MAX
-            && let Some(oldest) = map
-                .iter()
-                .min_by_key(|(_, e)| e.fetched_at)
-                .map(|(k, _)| k.clone())
-        {
-            map.remove(&oldest);
-        }
-        map.insert(
-            key,
-            CacheEntry {
-                data,
-                fetched_at: Instant::now(),
-            },
-        );
-    }
-}
-
-static CACHE: LazyLock<ApiCache> = LazyLock::new(|| ApiCache {
-    entries: Mutex::new(HashMap::new()),
-});
+static CACHE: LazyLock<Arc<JsonCache>> = LazyLock::new(|| JsonCache::new(4 * 1024 * 1024));
 
 #[derive(Clone)]
 pub struct CurseForgeClient {
@@ -410,8 +361,8 @@ impl CurseForgeClient {
         }
 
         let raw: serde_json::Value = resp.json().await?;
-        CACHE.set(url.to_string(), raw.clone());
-        serde_json::from_value(raw.clone()).map_err(|e| {
+        CACHE.set(url.to_string(), &raw);
+        T::deserialize(&raw).map_err(|e| {
             let full_body = raw.to_string();
             tracing::error!(
                 url = %url,

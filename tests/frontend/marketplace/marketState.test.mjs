@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, mock, spyOn, test } from "bun:test";
 import { plugin, Transpiler } from "bun";
+import { heapStats } from "bun:jsc";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { compileModule } from "svelte/compiler";
@@ -107,8 +108,16 @@ function result(source, id = "shared", total = 1) {
 			};
 }
 
+function page(provider, ids, total) {
+	const response = result(provider, ids[0] ?? "1", total);
+	const key = provider === "modrinth" ? "hits" : "data";
+	response[key] = ids.map((id) => result(provider, id)[key][0]);
+	return response;
+}
+
 let disk;
 let refreshLocal;
+const unregisterRefresh = mock();
 const scan = mock(async (_uuid) => structuredClone(disk));
 const searchModrinth = mock(async (..._args) => result("modrinth"));
 const searchCurseForge = mock(async (..._args) => result("curseforge", "42"));
@@ -150,7 +159,7 @@ mock.module(`${lib}/api/cubicApi`, () => api);
 mock.module(`${lib}/api/launcherService`, () => ({
 	registerModsRefreshCallback: (_uuid, callback) => {
 		refreshLocal = callback;
-		return () => {};
+		return unregisterRefresh;
 	},
 }));
 mock.module(`${lib}/state/state.svelte`, () => ({ showWarning: mock() }));
@@ -202,6 +211,7 @@ function snapshot(value) {
 }
 
 beforeEach(() => {
+	unregisterRefresh.mockClear();
 	disk = [file("a.jar"), file("b.jar")];
 	for (const fn of new Set(Object.values(api))) fn.mockClear();
 	scan.mockReset().mockImplementation(async () => structuredClone(disk));
@@ -231,11 +241,15 @@ test("same-project shader files have distinct selectable IDs and details use the
 		await settle();
 		expect(state.selectedProject?.installed?.filename).toBe(entry.filename);
 		expect(getMarketProjectId(state.selectedProject)).toBe("shared");
-		expect(getModrinthProject).toHaveBeenLastCalledWith("shared");
+		expect(getModrinthProject).toHaveBeenLastCalledWith(
+			"shared",
+			expect.any(AbortSignal),
+		);
 		expect(getModrinthProjectVersions).toHaveBeenLastCalledWith(
 			"shared",
 			"",
 			"1.21.1",
+			expect.any(AbortSignal),
 		);
 	}
 	await state.toggleEnabled(state.selectedProject);
@@ -265,13 +279,20 @@ test("enrichment preserves local IDs and selection, including CurseForge detail 
 	expect(getMarketProjectId(state.selectedProject)).toBe("42");
 	state.selectProject(state.selectedId);
 	await settle();
-	expect(getCurseForgeProject).toHaveBeenLastCalledWith(42);
+	expect(getCurseForgeProject).toHaveBeenLastCalledWith(
+		42,
+		expect.any(AbortSignal),
+	);
 	expect(getCurseForgeProjectFiles).toHaveBeenLastCalledWith(
 		42,
 		"fabric",
 		"1.21.1",
+		expect.any(AbortSignal),
 	);
-	expect(getCurseForgeProjectDescription).toHaveBeenLastCalledWith(42);
+	expect(getCurseForgeProjectDescription).toHaveBeenLastCalledWith(
+		42,
+		expect.any(AbortSignal),
+	);
 	expect(
 		getMarketProjectId(
 			localModToMarket(
@@ -370,16 +391,17 @@ test("toggle selection follows the renamed file when a newer scan supersedes its
 	expect(disk[0].filename).toBe("a.jar.disabled");
 	expect(scan.mock.calls.length).toBe(scans + 1);
 	refreshLocal();
-	expect(scan.mock.calls.length).toBe(scans + 2);
+	expect(scan.mock.calls.length).toBe(scans + 1);
 
 	// The operation's scan finishes first, but the newer scan owns the update.
 	toggleScan.resolve(structuredClone(disk));
-	await action;
 	await settle();
+	expect(scan.mock.calls.length).toBe(scans + 2);
 	expect(state.selectedId).toBe("local-a.jar");
 	expect(state.selectedProject?.installed?.filename).toBe("a.jar");
 
 	winningScan.resolve(structuredClone(disk));
+	await action;
 	await settle();
 	expect(state.selectedId).toBe("local-a.jar.disabled");
 	expect(state.selectedProject?.installed?.filename).toBe("a.jar.disabled");
@@ -495,6 +517,148 @@ test("a newer silent scan invalidates older enrichment results", async () => {
 for (const provider of ["modrinth", "curseforge"]) {
 	const id = provider === "modrinth" ? "shared" : "42";
 	const search = provider === "modrinth" ? searchModrinth : searchCurseForge;
+
+	test(`${provider}: typing supersedes a pending request and ignores its late response`, async () => {
+		await start();
+		if (provider !== "modrinth") await source(provider);
+		const old = deferred();
+		const latest = deferred();
+		search
+			.mockImplementationOnce(() => old.promise)
+			.mockImplementationOnce(() => latest.promise);
+		void state.refresh();
+		state.setQuery("sod");
+		state.setQuery("sodium");
+		const calls = search.mock.calls.length;
+		expect(state.loading).toBe(true);
+		await Bun.sleep(280);
+		expect(search.mock.calls.length).toBe(calls + 1);
+		expect(search.mock.lastCall[0]).toBe("sodium");
+		expect(search.mock.lastCall[4]).toBe("relevance");
+		old.resolve(result(provider, "999"));
+		await settle();
+		expect(state.loading).toBe(true);
+		expect(state.items).toHaveLength(0);
+		latest.resolve(result(provider, id));
+		await settle();
+		expect(state.loading).toBe(false);
+		expect(state.items.map((item) => item.id)).toEqual([id]);
+	});
+
+	test(`${provider}: filter changes invalidate errors even during the debounce window`, async () => {
+		await start();
+		if (provider !== "modrinth") await source(provider);
+		const pending = deferred();
+		search.mockImplementationOnce(() => pending.promise);
+		void state.refresh();
+		state.setCategory("optimization");
+		pending.reject(new Error("Obsolete request"));
+		await settle();
+		expect(state.error).toBeNull();
+		expect(state.loading).toBe(true);
+		await Bun.sleep(280);
+		await settle();
+		expect(search.mock.lastCall[3]).toBe(
+			provider === "modrinth" ? "optimization" : "6814",
+		);
+		expect(state.items.map((item) => item.id)).toEqual([id]);
+	});
+
+	test(`${provider}: automatic ranking respects explicit sorting and submit flushes the debounce`, async () => {
+		await start();
+		if (provider !== "modrinth") await source(provider);
+		expect(search.mock.lastCall[4]).toBe("downloads");
+		state.setQuery("  sodium  ");
+		await state.refresh();
+		expect(search.mock.lastCall[0]).toBe("sodium");
+		expect(search.mock.lastCall[4]).toBe("relevance");
+		state.setSort("newest");
+		state.setQuery("iris");
+		await state.refresh();
+		expect(search.mock.lastCall[4]).toBe("newest");
+		state.clearFilters();
+		await state.refresh();
+		expect(state.filters.query).toBe("iris");
+		expect(search.mock.lastCall[4]).toBe("relevance");
+		state.setQuery("");
+		await state.refresh();
+		expect(search.mock.lastCall[4]).toBe("downloads");
+		const calls = search.mock.calls.length;
+		await Bun.sleep(280);
+		expect(search.mock.calls.length).toBe(calls);
+	});
+
+	test(`${provider}: pagination keeps at most 300 projects and refetches older pages without losing scroll extent`, async () => {
+		await start();
+		if (provider !== "modrinth") await source(provider);
+		search.mockImplementation(async (...args) =>
+			page(
+				provider,
+				Array.from({ length: 20 }, (_, i) => String(args[6] + i + 1)),
+				340,
+			),
+		);
+		await state.refresh();
+		for (let i = 0; i < 16; i++) {
+			state.loadMore();
+			await settle();
+		}
+		expect(search.mock.lastCall[6]).toBe(320);
+		expect(state.items).toHaveLength(300);
+		expect(state.itemCount).toBe(340);
+		expect(state.cachedPageCount).toBe(15);
+		expect(state.getItem(0)).toBeUndefined();
+		expect(state.getItem(339).id).toBe("340");
+		state.ensureRange(0, 19);
+		await settle();
+		expect(search.mock.lastCall[6]).toBe(0);
+		expect(state.getItem(0).id).toBe("1");
+		expect(state.itemCount).toBe(340);
+		expect(state.items).toHaveLength(300);
+		expect(new Set(state.items.map((item) => item.id)).size).toBe(300);
+		expect(state.hasMore).toBe(false);
+	});
+
+	test(`${provider}: overlapping pages deduplicate cards without repeating offsets; empty pages stop loading`, async () => {
+		await start();
+		if (provider !== "modrinth") await source(provider);
+		search.mockResolvedValueOnce(page(provider, ["1", "2"], 10));
+		await state.refresh();
+		search.mockResolvedValueOnce(page(provider, ["2", "3"], 10));
+		state.loadMore();
+		await settle();
+		expect(search.mock.lastCall[6]).toBe(2);
+		expect(state.items.map((item) => item.id)).toEqual(["1", "2", "3"]);
+		search.mockResolvedValueOnce(page(provider, [], 10));
+		state.loadMore();
+		await settle();
+		expect(search.mock.lastCall[6]).toBe(4);
+		expect(state.hasMore).toBe(false);
+		const calls = search.mock.calls.length;
+		state.loadMore();
+		expect(search.mock.calls.length).toBe(calls);
+	});
+
+	test(`${provider}: a failed page can be retried at the same offset without losing results`, async () => {
+		await start();
+		if (provider !== "modrinth") await source(provider);
+		search.mockResolvedValueOnce(page(provider, ["1"], 2));
+		await state.refresh();
+		search.mockResolvedValueOnce(null);
+		state.loadMore();
+		await settle();
+		expect(state.error).not.toBeNull();
+		expect(state.items.map((item) => item.id)).toEqual(["1"]);
+		const calls = search.mock.calls.length;
+		state.loadMore();
+		expect(search.mock.calls.length).toBe(calls);
+		search.mockResolvedValueOnce(page(provider, ["2"], 2));
+		await state.retry();
+		expect(search.mock.lastCall[6]).toBe(1);
+		expect(state.items.map((item) => item.id)).toEqual(["1", "2"]);
+		expect(state.error).toBeNull();
+		expect(state.hasMore).toBe(false);
+	});
 	for (const mode of ["reset", "loadMore"]) {
 		test(`${provider}: pending ${mode} cannot overwrite Local or its pagination`, async () => {
 			await start();
@@ -574,3 +738,218 @@ for (const provider of ["modrinth", "curseforge"]) {
 		expect(state.error).toBeNull();
 	});
 }
+
+test("local queries filter immediately and source changes retain the query", async () => {
+	disk = [file("a.jar", { name: "Sodium" }), file("b.jar", { name: "Iris" })];
+	await start();
+	await source("local");
+	const scans = scan.mock.calls.length;
+	state.setQuery("  sodium  ");
+	expect(state.items.map((item) => item.title)).toEqual(["Sodium"]);
+	expect(scan.mock.calls.length).toBe(scans);
+	await source("curseforge");
+	expect(searchCurseForge.mock.lastCall[0]).toBe("sodium");
+});
+
+test("closing or switching details prevents a late response from replacing the current project", async () => {
+	await start();
+	await source("local");
+	const old = deferred();
+	getModrinthProject.mockImplementationOnce(() => old.promise);
+	state.selectProject("local-a.jar");
+	state.selectProject(null);
+	getModrinthProject.mockResolvedValueOnce({
+		id: "latest",
+		body: "Latest description",
+	});
+	state.selectProject("local-b.jar");
+	await settle();
+	old.resolve({ id: "obsolete", body: "Old description" });
+	await settle();
+	expect(state.selectedId).toBe("local-b.jar");
+	expect(state.detail.fullProject.id).toBe("latest");
+	expect(state.detail.loading).toBe(false);
+});
+
+test("destroy cancels scheduled searches and ignores in-flight results", async () => {
+	await start();
+	const pending = deferred();
+	searchModrinth.mockImplementationOnce(() => pending.promise);
+	void state.refresh();
+	state.setQuery("sodium");
+	const calls = searchModrinth.mock.calls.length;
+	state.destroy();
+	pending.resolve(result("modrinth"));
+	await Bun.sleep(280);
+	await settle();
+	expect(searchModrinth.mock.calls.length).toBe(calls);
+	expect(state.items).toHaveLength(0);
+});
+
+for (const operation of ["confirmInstall", "uninstall", "toggleEnabled"]) {
+	test(`${operation}: completing after destroy cannot rescan or repopulate the market`, async () => {
+		await start();
+		await source("local");
+		const project = state.items[0];
+		const pending = deferred();
+		const fn =
+			operation === "confirmInstall"
+				? api.downloadMods
+				: operation === "uninstall"
+					? deleteInstanceFile
+					: toggleInstanceMod;
+		fn.mockImplementationOnce(() => pending.promise);
+		const action =
+			operation === "confirmInstall"
+				? state.confirmInstall(project, [
+						{
+							url: "https://example.test/a.jar",
+							filename: "a.jar",
+							project_id: "shared",
+							version_id: "v1",
+						},
+					])
+				: state[operation](project);
+		const scans = scan.mock.calls.length;
+		state.destroy();
+		state.destroy();
+		pending.resolve();
+		await action;
+		refreshLocal();
+		await state.refresh();
+		state.setQuery("sodium");
+		state.setSource("curseforge");
+		state.loadMore();
+		await settle();
+		expect(unregisterRefresh).toHaveBeenCalledTimes(1);
+		expect(scan.mock.calls.length).toBe(scans);
+		expect(state.items).toHaveLength(0);
+		expect(state.cachedPageCount).toBe(0);
+		expect(state.itemCount).toBe(0);
+		expect(state.loading).toBe(false);
+	});
+}
+
+test("a burst of enrichment events shares one scan and one final refresh", async () => {
+	await start();
+	await source("local");
+	const pending = deferred();
+	scan.mockImplementationOnce(() => pending.promise);
+	const scans = scan.mock.calls.length;
+	for (let i = 0; i < 100; i++) refreshLocal();
+	expect(scan.mock.calls.length).toBe(scans + 1);
+	pending.resolve([file("stale.jar")]);
+	await settle();
+	expect(scan.mock.calls.length).toBe(scans + 2);
+	expect(localIds()).toEqual(["local-a.jar", "local-b.jar"]);
+});
+
+test("closing during a scan discards its data and its queued refresh", async () => {
+	await start();
+	const pending = deferred();
+	scan.mockImplementationOnce(() => pending.promise);
+	refreshLocal();
+	refreshLocal();
+	const calls = scan.mock.calls.length;
+	state.destroy();
+	pending.resolve(disk);
+	await settle();
+	expect(scan.mock.calls.length).toBe(calls);
+	expect(state.items).toHaveLength(0);
+	expect(state.loading).toBe(false);
+});
+
+test("query changes and closing abort the signals sent to native searches and details", async () => {
+	await start();
+	const pending = deferred();
+	searchModrinth.mockImplementationOnce(() => pending.promise);
+	void state.refresh();
+	const signal = searchModrinth.mock.lastCall[8];
+	expect(signal.aborted).toBe(false);
+	state.setQuery("new query");
+	expect(signal.aborted).toBe(true);
+	pending.resolve(result("modrinth"));
+	await source("local");
+	state.setQuery("");
+	const detail = deferred();
+	getModrinthProject.mockImplementationOnce(() => detail.promise);
+	state.selectProject("local-a.jar");
+	const detailSignal = getModrinthProject.mock.lastCall[1];
+	expect(detailSignal.aborted).toBe(false);
+	state.destroy();
+	expect(detailSignal.aborted).toBe(true);
+	detail.resolve({ id: "stale", body: "Late response" });
+	await settle();
+	expect(state.detail.fullProject).toBeUndefined();
+});
+
+test("long browsing sessions retain bounded pages, and repeated sessions release them", async () => {
+	const closedHeapBytes = [];
+	const sessions = Math.max(
+		1,
+		Math.min(50, Number(process.env.MARKET_MEMORY_SESSIONS) || 5),
+	);
+	let firstTypes;
+	for (let session = 0; session < sessions; session++) {
+		await new Promise((done, fail) =>
+			setTimeout(() => {
+				const runSession = async () => {
+					searchModrinth.mockImplementation(async (...args) =>
+						page(
+							"modrinth",
+							Array.from({ length: 20 }, (_, i) =>
+								String(args[6] + i),
+							),
+							10000,
+						),
+					);
+					await start();
+					for (let i = 0; i < 99; i++) {
+						state.loadMore();
+						await settle();
+						// Mock histories would otherwise retain every resolved API payload.
+						searchModrinth.mockClear();
+					}
+					expect(state.itemCount).toBe(2000);
+					expect(state.items.length).toBe(300);
+					expect(state.cachedPageCount).toBe(15);
+					state.destroy();
+					expect(state.items.length).toBe(0);
+					expect(state.cachedPageCount).toBe(0);
+					expect(state.itemCount).toBe(0);
+					dispose();
+					dispose = undefined;
+					state = undefined;
+					refreshLocal = undefined;
+					// Bun mock histories retain call frames as well as resolved payloads.
+					for (const fn of new Set(Object.values(api)))
+						fn.mockClear();
+					unregisterRefresh.mockClear();
+				};
+				void runSession().then(done, fail);
+			}, 0),
+		);
+		await settle();
+		Bun.gc(true);
+		await Bun.sleep(0);
+		Bun.gc(true);
+		const stats = heapStats();
+		closedHeapBytes.push(stats.heapSize);
+		if (!firstTypes) firstTypes = stats.objectTypeCounts;
+		if (process.env.MARKET_MEMORY_PROFILE && session === sessions - 1) {
+			console.info(
+				"[market retention] object count deltas:",
+				Object.entries(stats.objectTypeCounts)
+					.map(([name, count]) => [
+						name,
+						count - (firstTypes[name] ?? 0),
+					])
+					.filter(([, count]) => count !== 0),
+			);
+		}
+	}
+	console.info(
+		`[market retention] ${sessions} sessions × 2000 results; max 300 cached, 0 after destroy; JSC closed heap bytes:`,
+		closedHeapBytes,
+	);
+}, 60000);

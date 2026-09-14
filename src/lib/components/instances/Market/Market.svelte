@@ -31,6 +31,17 @@
 	});
 
 	const emptyState = $derived.by(() => {
+		if (
+			state.filters.query.trim() ||
+			(state.filters.source === "local"
+				? state.filters.localSource !== "all"
+				: state.filters.category !== null)
+		) {
+			return {
+				title: t("market.empty.searchTitle"),
+				subtitle: t("market.empty.searchSubtitle"),
+			};
+		}
 		if (state.filters.source === "local") {
 			return {
 				title: t("market.empty.localTitle"),
@@ -38,12 +49,8 @@
 			};
 		}
 		return {
-			title: state.filters.query
-				? t("market.empty.searchTitle")
-				: t("market.empty.marketTitle"),
-			subtitle: state.filters.query
-				? t("market.empty.searchSubtitle")
-				: t("market.empty.marketSubtitle"),
+			title: t("market.empty.marketTitle"),
+			subtitle: t("market.empty.marketSubtitle"),
 		};
 	});
 </script>
@@ -51,44 +58,65 @@
 <div class="market-root">
 	<MarketLayout
 		items={state.items}
-		selectedId={state.selectedId}
+		itemCount={state.itemCount}
+		getItem={state.getItem}
+		onRangeNeeded={state.ensureRange}
+		total={state.total}
+		resultsRevision={state.resultsRevision}
+		selectedId={state.selectedProject?.id ?? null}
+		detailTitle={state.selectedProject?.title ?? ""}
 		loading={state.loading}
 		loadingMore={state.loadingMore}
 		hasMore={state.hasMore}
 		error={state.error}
-		onSelect={state.selectProject}
+		onClose={() => state.selectProject(null)}
+		onRetry={state.retry}
 		onLoadMore={state.loadMore}
-		keyFn={(p) => p.id}
 	>
 		{#snippet filterPanel()}
 			<MarketFilterPanel
 				filters={state.filters}
 				{contentType}
+				active={state.selectedProject === null}
 				onSourceChange={state.setSource}
 				onQueryChange={state.setQuery}
+				onSearch={state.refresh}
 				onSortChange={state.setSort}
 				onCategoryChange={state.setCategory}
 				onLocalSortChange={state.setLocalSort}
 				onLocalSourceChange={state.setLocalSource}
+				onClearFilters={state.clearFilters}
 			/>
 		{/snippet}
 
+		{#snippet emptySnippet()}
+			<MarketEmptyState
+				title={emptyState.title}
+				subtitle={emptyState.subtitle}
+			/>
+			<div class="empty-actions">
+				{#if state.filters.query}
+					<button type="button" onclick={() => state.setQuery("")}
+						>{t("market.filter.clearSearch")}</button
+					>
+				{/if}
+				{#if state.filters.source === "local" ? state.filters.localSource !== "all" : state.filters.category !== null}
+					<button type="button" onclick={state.clearFilters}
+						>{t("market.browse.clearFilters")}</button
+					>
+				{/if}
+			</div>
+		{/snippet}
+
 		{#snippet itemSnippet(project)}
-			{#if Object.keys(project).length === 0}
-				<MarketEmptyState
-					title={emptyState.title}
-					subtitle={emptyState.subtitle}
-				/>
-			{:else}
-				<MarketItem
-					{project}
-					selected={project.id === state.selectedId}
-					onSelect={() => state.selectProject(project.id)}
-					onInstall={state.filters.source !== "local"
-						? () => state.selectProject(project.id)
-						: undefined}
-				/>
-			{/if}
+			<MarketItem
+				{project}
+				selected={project.id === state.selectedId}
+				onSelect={() => state.selectProject(project.id)}
+				onInstall={state.filters.source !== "local"
+					? () => state.selectProject(project.id)
+					: undefined}
+			/>
 		{/snippet}
 
 		{#snippet detailSnippet()}
@@ -119,6 +147,29 @@
 </div>
 
 <style>
+	.empty-actions {
+		display: flex;
+		gap: 10px;
+		flex-wrap: wrap;
+		justify-content: center;
+	}
+	.empty-actions button {
+		padding: 8px 14px;
+		border: 1px solid var(--border);
+		border-radius: var(--border-radius-sm);
+		background: var(--surface-card);
+		color: var(--text-primary);
+		font: inherit;
+		font-size: 0.8rem;
+		cursor: pointer;
+	}
+	.empty-actions button:focus-visible {
+		outline: 2px solid var(--accent);
+		outline-offset: 2px;
+	}
+	.empty-actions button:hover {
+		border-color: var(--accent);
+	}
 	.market-root {
 		position: absolute;
 		inset: 0;

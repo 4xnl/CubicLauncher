@@ -35,36 +35,12 @@ fn build_modrinth_facets(
 
 pub(crate) async fn get_json(url: &str) -> Result<serde_json::Value, String> {
     use crate::core::http_client::HTTP;
+    use crate::core::json_cache::JsonCache;
     use serde_json::Value;
-    use std::collections::HashMap;
-    use std::sync::LazyLock;
-    use std::sync::Mutex;
-    use std::time::Instant;
-
-    const CACHE_TTL: u64 = 300;
-    const CACHE_MAX: usize = 200;
-
-    struct CacheEntry {
-        data: Value,
-        fetched_at: Instant,
-    }
-
-    struct ApiCache {
-        entries: Mutex<HashMap<String, CacheEntry>>,
-    }
-
-    static CACHE: LazyLock<ApiCache> = LazyLock::new(|| ApiCache {
-        entries: Mutex::new(HashMap::new()),
-    });
-
-    {
-        let mut map = CACHE.entries.lock().unwrap();
-        if let Some(entry) = map.get(url) {
-            if entry.fetched_at.elapsed().as_secs() < CACHE_TTL {
-                return Ok(entry.data.clone());
-            }
-            map.remove(url);
-        }
+    use std::sync::{Arc, LazyLock};
+    static CACHE: LazyLock<Arc<JsonCache>> = LazyLock::new(|| JsonCache::new(4 * 1024 * 1024));
+    if let Some(data) = CACHE.get(url) {
+        return Ok(data);
     }
 
     let resp = HTTP
@@ -88,24 +64,7 @@ pub(crate) async fn get_json(url: &str) -> Result<serde_json::Value, String> {
         .await
         .map_err(|e| format!("Failed to parse response: {}", e))?;
 
-    {
-        let mut map = CACHE.entries.lock().unwrap();
-        if map.len() >= CACHE_MAX
-            && let Some(oldest) = map
-                .iter()
-                .min_by_key(|(_, e)| e.fetched_at)
-                .map(|(k, _)| k.clone())
-        {
-            map.remove(&oldest);
-        }
-        map.insert(
-            url.to_string(),
-            CacheEntry {
-                data: data.clone(),
-                fetched_at: Instant::now(),
-            },
-        );
-    }
+    CACHE.set(url.to_string(), &data);
 
     Ok(data)
 }
