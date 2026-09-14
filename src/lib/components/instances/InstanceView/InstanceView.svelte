@@ -124,34 +124,6 @@
 						<button
 							type="button"
 							class="nav-item priority"
-							onclick={() => (activeSection = "worlds")}
-						>
-							<span class="nav-icon"><WorldIcon size={18} /></span
-							>
-							<span class="nav-label">{t("worlds.title")}</span>
-							<span class="nav-chevron"
-								><ChevronRightIcon size={14} /></span
-							>
-						</button>
-						<button
-							type="button"
-							class="nav-item priority"
-							onclick={() => (activeSection = "servers")}
-						>
-							<span class="nav-icon"
-								><Icon
-									name="instance:servers"
-									size={18}
-								/></span
-							>
-							<span class="nav-label">{t("servers.title")}</span>
-							<span class="nav-chevron"
-								><ChevronRightIcon size={14} /></span
-							>
-						</button>
-						<button
-							type="button"
-							class="nav-item priority"
 							onclick={() => (activeSection = "resources")}
 						>
 							<span class="nav-icon"
@@ -159,21 +131,6 @@
 							>
 							<span class="nav-label"
 								>{t("instanceView.tabs.resources")}</span
-							>
-							<span class="nav-chevron"
-								><ChevronRightIcon size={14} /></span
-							>
-						</button>
-						<button
-							type="button"
-							class="nav-item"
-							class:secondary={supportsMods}
-							onclick={() => (activeSection = "screenshots")}
-						>
-							<span class="nav-icon"><ImageIcon size={18} /></span
-							>
-							<span class="nav-label"
-								>{t("instanceView.tabs.screenshots")}</span
 							>
 							<span class="nav-chevron"
 								><ChevronRightIcon size={14} /></span
@@ -196,6 +153,49 @@
 								>
 							</button>
 						{/if}
+						<div class="nav-divider" role="separator"></div>
+						<button
+							type="button"
+							class="nav-item"
+							onclick={() => (activeSection = "worlds")}
+						>
+							<span class="nav-icon"><WorldIcon size={18} /></span
+							>
+							<span class="nav-label">{t("worlds.title")}</span>
+							<span class="nav-chevron"
+								><ChevronRightIcon size={14} /></span
+							>
+						</button>
+						<button
+							type="button"
+							class="nav-item"
+							onclick={() => (activeSection = "servers")}
+						>
+							<span class="nav-icon"
+								><Icon
+									name="instance:servers"
+									size={18}
+								/></span
+							>
+							<span class="nav-label">{t("servers.title")}</span>
+							<span class="nav-chevron"
+								><ChevronRightIcon size={14} /></span
+							>
+						</button>
+						<button
+							type="button"
+							class="nav-item"
+							onclick={() => (activeSection = "screenshots")}
+						>
+							<span class="nav-icon"><ImageIcon size={18} /></span
+							>
+							<span class="nav-label"
+								>{t("instanceView.tabs.screenshots")}</span
+							>
+							<span class="nav-chevron"
+								><ChevronRightIcon size={14} /></span
+							>
+						</button>
 					</div>
 				</div>
 			</div>
@@ -314,10 +314,10 @@
 		display: flex;
 		align-items: center;
 		gap: 10px;
-		padding: 11px 14px;
+		min-height: 40px;
+		padding: 10px 14px;
 		background: transparent;
 		border: none;
-		border-top: 1px solid var(--border);
 		color: var(--text-secondary);
 		font-family: inherit;
 		font-size: 0.82rem;
@@ -330,8 +330,15 @@
 		width: 100%;
 	}
 
-	.nav-item:first-child {
-		border-top: none;
+	.nav-divider {
+		height: 1px;
+		margin: 6px 14px;
+		background: var(--border);
+	}
+
+	.nav-item:focus-visible {
+		outline: 2px solid var(--accent);
+		outline-offset: -2px;
 	}
 
 	.nav-item:hover {
@@ -345,6 +352,10 @@
 
 	.nav-icon {
 		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 20px;
+		height: 20px;
 		flex-shrink: 0;
 		opacity: 0.7;
 	}
@@ -356,10 +367,15 @@
 	.nav-label {
 		flex: 1;
 		min-width: 0;
+		overflow-wrap: anywhere;
 	}
 
 	.nav-chevron {
 		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 16px;
+		height: 20px;
 		flex-shrink: 0;
 		opacity: 0.4;
 		transition:
