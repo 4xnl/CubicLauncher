@@ -266,7 +266,7 @@ fn build_cubic_manifest(input: &ExportInput) -> String {
 
 fn loader_to_mmc_uid(loader: &Loader) -> Option<&'static str> {
     match loader {
-        Loader::Vanilla => None,
+        Loader::Vanilla | Loader::OptiFine(_) => None,
         Loader::Fabric(_) => Some("net.fabricmc.fabric-loader"),
         Loader::Forge(_) => Some("net.minecraftforge"),
         Loader::NeoForge(_) => Some("net.neoforged"),

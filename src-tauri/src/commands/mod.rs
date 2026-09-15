@@ -11,6 +11,7 @@ pub mod log_window;
 pub mod market;
 pub mod modrinth;
 pub mod neoforge;
+pub mod optifine;
 pub mod others;
 pub mod pack;
 pub mod profile;

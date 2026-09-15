@@ -7,6 +7,7 @@ pub enum Loader {
     Forge(String),
     NeoForge(String),
     Quilt(String),
+    OptiFine(String),
 }
 
 impl Loader {
@@ -19,7 +20,9 @@ impl Loader {
     ///   "quilt-loader-0.25.0-1.20.1"
     pub fn from_version_id(id: &str) -> Self {
         let lower = id.to_lowercase();
-        if lower.contains("neoforge") {
+        if let Some((_, version)) = id.split_once("-OptiFine_") {
+            Self::OptiFine(version.into())
+        } else if lower.contains("neoforge") {
             Self::NeoForge(extract_loader_version(id))
         } else if lower.contains("forge") {
             Self::Forge(extract_loader_version(id))
@@ -39,15 +42,18 @@ impl Loader {
             Self::Forge(_) => "Forge",
             Self::NeoForge(_) => "NeoForge",
             Self::Quilt(_) => "Quilt",
+            Self::OptiFine(_) => "OptiFine",
         }
     }
 
     pub fn version(&self) -> Option<&str> {
         match self {
             Self::Vanilla => None,
-            Self::Fabric(v) | Self::Forge(v) | Self::NeoForge(v) | Self::Quilt(v) => {
-                Some(v.as_str())
-            }
+            Self::Fabric(v)
+            | Self::Forge(v)
+            | Self::NeoForge(v)
+            | Self::Quilt(v)
+            | Self::OptiFine(v) => Some(v.as_str()),
         }
     }
 
@@ -64,6 +70,7 @@ impl std::fmt::Display for Loader {
             Self::Forge(v) => write!(f, "Forge ({v})"),
             Self::NeoForge(v) => write!(f, "NeoForge ({v})"),
             Self::Quilt(v) => write!(f, "Quilt ({v})"),
+            Self::OptiFine(v) => write!(f, "OptiFine ({v})"),
         }
     }
 }

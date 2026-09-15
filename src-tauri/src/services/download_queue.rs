@@ -238,7 +238,9 @@ impl DownloadQueue {
             return;
         }
 
-        let result = if version.contains("-neoforge-") {
+        let result = if version.contains("-OptiFine_") {
+            Self::process_optifine_version(shared_dir, &manager, queue, version.clone()).await
+        } else if version.contains("-neoforge-") {
             Self::process_neoforge_version(shared_dir, &manager, queue, version.clone()).await
         } else if version.contains("-forge-") && !version.contains("-neoforge-") {
             Self::process_forge_version(shared_dir, &manager, queue, version.clone()).await
@@ -333,6 +335,43 @@ impl DownloadQueue {
         download_with_progress(version.clone(), handle, queue.clone()).await?;
 
         download_base_mc(version, &game_version, manager, queue).await
+    }
+
+    async fn process_optifine_version(
+        shared_dir: PathBuf,
+        manager: &DownloadManager,
+        queue: &Arc<DownloadQueue>,
+        version: Arc<str>,
+    ) -> Result<(), aqua::AquaError> {
+        emit_stage(&version, "resolving", Some("OptiFine".into()));
+        let release = crate::commands::optifine::resolve_version(&version)
+            .await
+            .map_err(aqua::AquaError::Other)?;
+        let (base, _) = aqua::resolve_version_data(&release.game_version).await?;
+        let java_version = base.java_version;
+        if !JavaManager::is_installed(java_version) {
+            emit_stage(
+                &version,
+                "jre",
+                Some(format!("Java {java_version} para OptiFine")),
+            );
+            let pkg = JavaManager::get_latest_package(java_version)
+                .await
+                .map_err(|e| aqua::AquaError::Other(e.to_string()))?;
+            let batch = JreBatch::new(java_version, pkg, JavaManager::get_jre_dir(java_version));
+            let handle = manager.prepare_batch(Box::new(batch)).await?;
+            download_with_progress(version.clone(), handle, queue.clone()).await?;
+        }
+        download_base_mc(version.clone(), &release.game_version, manager, queue).await?;
+        emit_stage(&version, "resolving", Some("OptiFine installer".into()));
+        let batch = aqua::OptiFineBatch::new(
+            &shared_dir,
+            release,
+            JavaManager::get_java_binary(java_version),
+        )
+        .await?;
+        let handle = manager.prepare_batch(Box::new(batch)).await?;
+        download_with_progress(version, handle, queue.clone()).await
     }
 
     async fn process_forge_version(

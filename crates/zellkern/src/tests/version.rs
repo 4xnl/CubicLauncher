@@ -107,3 +107,16 @@ fn dependencies_quilt() {
     let deps = resolve_dependencies("quilt-loader-0.25.0-1.20.1");
     assert_eq!(deps, vec!["1.20.1", "quilt-loader-0.25.0-1.20.1"]);
 }
+
+#[test]
+fn optifine_version_roundtrip_and_dependencies() {
+    for id in ["1.12.2-OptiFine_HD_U_G5", "1.21-OptiFine_HD_U_J1_pre9"] {
+        let version = crate::GameVersion::from_version_id(id);
+        assert!(matches!(version.loader, crate::Loader::OptiFine(_)));
+        assert_eq!(version.to_version_id(), id);
+        assert_eq!(
+            crate::resolve_dependencies(id),
+            vec![version.mc_version, id.into()]
+        );
+    }
+}

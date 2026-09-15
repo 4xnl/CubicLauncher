@@ -187,6 +187,7 @@ pub async fn install_mrpack(
 
     match &game_version.loader {
         zellkern::Loader::Fabric(_)
+        | zellkern::Loader::OptiFine(_)
         | zellkern::Loader::Quilt(_)
         | zellkern::Loader::Forge(_)
         | zellkern::Loader::NeoForge(_) => {
@@ -415,6 +416,7 @@ pub async fn install_curseforge_modpack(
 
     match &game_version.loader {
         zellkern::Loader::Fabric(_)
+        | zellkern::Loader::OptiFine(_)
         | zellkern::Loader::Quilt(_)
         | zellkern::Loader::Forge(_)
         | zellkern::Loader::NeoForge(_) => {
