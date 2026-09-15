@@ -198,6 +198,20 @@ La comparación anterior cargaba/decodificaba la lista completa dos veces (lectu
 - [ ] Activar/desactivar un mod con otra version instalada: solo debe renombrarse el archivo seleccionado, conservando la seleccion tras el refresco.
 - [ ] Cambiar de Modrinth/CurseForge a Local con una peticion pendiente: la respuesta tardia no debe reemplazar ni mezclarse con los archivos locales.
 
+#### Memoria y ciclo de vida de la market
+
+- Ejecutar `bun test --conditions=browser ./tests/frontend/marketplace` y `cargo test -p cubiclauncher --lib market_`.
+- El escenario sintético recorre 2000 resultados en cinco sesiones: retiene como máximo 15 páginas / 300 proyectos por sesión y cero páginas tras destruirla. Imprime el heap de JavaScriptCore tras cada cierre y GC; la primera sesión incluye calentamiento y las cifras no equivalen al RSS ni incluyen DOM, imágenes o WebView.
+- Para un perfil más largo: `NODE_ENV=production MARKET_MEMORY_SESSIONS=50 MARKET_MEMORY_PROFILE=1 bun test --conditions=browser --conditions=production ./tests/frontend/marketplace/marketState.test.mjs -t "long browsing"`. La fixture limpia también historiales de mocks antes de medir: estos retienen payloads y frames de llamadas, y contaminarían el perfil. Las diferencias de tipos de objetos ayudan a distinguir calentamiento del motor de estados retenidos por sesión.
+- Referencia sintética en Linux/Bun 1.3.14: en 50 sesiones (100 000 resultados procesados), las últimas diez mediciones tras cerrar y GC quedaron entre 10 403 120 y 10 412 396 bytes de heap JSC (~9.93 MiB). El conteo final no aumentó en mapas, proxies ni entornos léxicos respecto al primer cierre. Son mediciones del harness, no un umbral de RAM del launcher ni una sustitución de los snapshots del WebView.
+- Las cachés nativas conservan hasta 4 MiB de JSON serializado y claves por proveedor, 200 entradas y 1 MiB por entrada. Las respuestas mayores siguen disponibles, pero no se cachean. Expiran a los cinco minutos; un barrido cada minuto también libera entradas durante la inactividad. El presupuesto excluye estructuras auxiliares y respuestas en vuelo.
+- La caché Markdown admite hasta 18 entradas / 2 MiB estimados de cadenas UTF-16, incluyendo claves construidas a partir del texto limitado.
+- Las consultas de lectura cancelables comparten cuatro slots nativos. Cada petición tiene límite temporal y registro con limpieza al finalizar; las cancelaciones anticipadas se conservan temporalmente en una tabla limitada a 128 entradas para resolver carreras entre mensajes IPC.
+- [ ] Recorrer más de 300 resultados y volver arriba: las páginas descartadas se recuperan sin reiniciar el scroll. Abrir/cerrar un detalle debe mantener la posición.
+- [ ] Repetir apertura/cierre de la market y de sus selectores mientras hay consultas lentas, escaneos o resolución de dependencias. No deben quedar menús, listeners, observadores ni tarjetas desconectadas retenidas en snapshots del WebView.
+- [ ] Cerrar durante una descarga confirmada: la descarga debe continuar; su finalización no debe reactivar el estado desmontado. Volver a abrir y comprobar los archivos instalados.
+- [ ] Comparar snapshots después de varias sesiones equivalentes y tras expirar cachés. Separar heap JS, imágenes y cachés nativas del RSS total del proceso.
+
 ### Autenticación
 
 - [ ] Cambiar entre usuarios guardados.

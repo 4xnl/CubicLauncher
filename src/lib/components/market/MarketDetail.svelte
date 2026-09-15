@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onDestroy } from "svelte";
 	import { t } from "$lib/i18n";
 	import {
 		openUrl,
@@ -69,6 +70,20 @@
 	let depConflicts = $state<DependencyConflict[]>([]);
 	let installedProjectIds = $state<Set<string>>(new Set());
 	let modalError = $state<string | null>(null);
+	let disposed = false;
+	let downloading = false;
+	let installGeneration = 0;
+
+	function releaseDependencies() {
+		depTree = [];
+		depConflicts = [];
+		installedProjectIds = new Set();
+	}
+	onDestroy(() => {
+		disposed = true;
+		installGeneration++;
+		releaseDependencies();
+	});
 
 	const bodySource = $derived(
 		project.source !== "curseforge"
@@ -144,7 +159,8 @@
 	}
 
 	async function handleInstall() {
-		if (!selectedVersion) return;
+		if (disposed || !selectedVersion) return;
+		const generation = ++installGeneration;
 
 		installing = true;
 		actionError = null;
@@ -155,6 +171,7 @@
 					project,
 					selectedVersion,
 				);
+				if (disposed || generation !== installGeneration) return;
 				if (!single) {
 					throw new Error("No download URL available");
 				}
@@ -170,35 +187,49 @@
 			installedProjectIds = new Set();
 
 			const result = await onPrepareInstall();
+			if (disposed || generation !== installGeneration) return;
 			depTree = result.tree;
 			depConflicts = result.conflicts;
 			installedProjectIds = result.installedProjectIds;
 		} catch (e) {
+			if (disposed || generation !== installGeneration) return;
 			modalError = String(e ?? "Install failed");
 			actionError = String(e ?? "Install failed");
 		} finally {
-			resolvingDeps = false;
-			installing = false;
+			if (!disposed && generation === installGeneration) {
+				resolvingDeps = false;
+				installing = false;
+			}
 		}
 	}
 
 	async function handleConfirmInstall(queue: ModDownloadInfo[]) {
+		if (disposed || downloading) return;
+		downloading = true;
 		installing = true;
 		actionError = null;
 		try {
 			await onInstallQueue(queue);
+			if (disposed) return;
 			modalOpen = false;
+			releaseDependencies();
 		} catch (e) {
+			if (disposed) return;
 			actionError = String(e ?? "Install failed");
 			modalError = String(e ?? "Install failed");
 		} finally {
-			installing = false;
+			downloading = false;
+			if (!disposed) installing = false;
 		}
 	}
 
 	function handleCancelInstall() {
+		installGeneration++;
+		resolvingDeps = false;
+		installing = downloading;
 		modalOpen = false;
 		modalError = null;
+		releaseDependencies();
 	}
 
 	const modrinthTypePath = $derived(
@@ -223,182 +254,197 @@
 
 <div class="market-detail">
 	<div class="market-detail-header">
-		<button
-			type="button"
-			class="market-detail-close"
-			onclick={onClose}
-			aria-label={t("market.detail.close")}
-		>
-			<Icon name="ui:close" size={14} />
+		<button type="button" class="market-detail-close" onclick={onClose}>
+			<Icon name="ui:chevron-left" size={16} />
+			{t("market.detail.backToCatalog")}
 		</button>
+		{#if detail.loading}
+			<span class="market-detail-loading" role="status">
+				<Loading class="detail-version-spinner" />
+				{t("market.detail.loadingDetails")}
+			</span>
+		{/if}
 	</div>
 
 	<div class="market-detail-scroll">
-		<div class="market-detail-icon">
-			{#if project.icon && !iconError}
-				<img
-					src={project.icon}
-					alt={project.title}
-					loading="lazy"
-					decoding="async"
-					onerror={() => (iconError = true)}
-				/>
-			{:else}
-				<CubicLogo />
-			{/if}
+		<div class="market-detail-hero">
+			<div class="market-detail-icon">
+				{#if project.icon && !iconError}
+					<img
+						src={project.icon}
+						alt={project.title}
+						loading="lazy"
+						decoding="async"
+						onerror={() => (iconError = true)}
+					/>
+				{:else}
+					<CubicLogo />
+				{/if}
+			</div>
+
+			<div class="market-detail-identity">
+				<h2 class="market-detail-title">{project.title}</h2>
+				<p class="market-detail-author">
+					{t("market.detail.by")}
+					{project.author || t("market.detail.unknownAuthor")}
+				</p>
+			</div>
 		</div>
 
-		<h3 class="market-detail-title">{project.title}</h3>
-		<p class="market-detail-author">
-			{t("market.detail.by")}
-			{project.author || t("market.detail.unknownAuthor")}
-		</p>
+		<div class="market-detail-columns">
+			<aside
+				class="market-detail-sidebar"
+				aria-label={t("market.detail.installation")}
+			>
+				{#if source !== "local"}
+					<div class="market-detail-stats">
+						<div class="market-detail-stat">
+							<span class="market-detail-stat-label"
+								>{t("market.detail.downloads")}</span
+							>
+							<span class="market-detail-stat-value"
+								>{formatNumber(project.downloadCount)}</span
+							>
+						</div>
+					</div>
+				{/if}
 
-		{#if source !== "local"}
-			<div class="market-detail-stats">
-				<div class="market-detail-stat">
-					<span class="market-detail-stat-label"
-						>{t("market.detail.downloads")}</span
-					>
-					<span class="market-detail-stat-value"
-						>{formatNumber(project.downloadCount)}</span
-					>
-				</div>
-			</div>
-		{/if}
-
-		{#if project.source !== "curseforge" && (detail.fullProject as ModrinthProjectFull)?.categories?.length}
-			<div class="market-detail-tags">
-				{#each (detail.fullProject as ModrinthProjectFull).categories as category (category)}
-					<span class="market-detail-tag">{category}</span>
-				{/each}
-			</div>
-		{/if}
-
-		{#if source !== "local"}
-			<div class="market-detail-version">
-				{#if detail.loading || detail.versions.length === 0}
-					<span class="market-detail-version-loading">
-						{#if detail.loading}
-							<Loading class="detail-version-spinner" />
+				{#if source !== "local"}
+					<div class="market-detail-version">
+						{#if detail.loading || detail.versions.length === 0}
+							<span class="market-detail-version-loading">
+								{#if detail.loading}
+									<Loading class="detail-version-spinner" />
+								{/if}
+								{detail.loading
+									? t("market.detail.loadingVersions")
+									: t("market.detail.noVersions")}
+							</span>
+						{:else}
+							<div class="market-detail-version-row">
+								<span class="market-detail-version-label"
+									>{t("market.detail.version")}</span
+								>
+								<Dropdown
+									value={selectedVersion?.id ?? ""}
+									options={versionOptions}
+									placeholder={t(
+										"market.detail.selectVersion",
+									)}
+									onchange={(value) => {
+										const version = detail.versions.find(
+											(v) => v.id === value,
+										);
+										if (version) onVersionSelect(version);
+									}}
+								/>
+							</div>
 						{/if}
-						{detail.loading
-							? t("market.detail.loadingVersions")
-							: t("market.detail.noVersions")}
-					</span>
-				{:else}
-					<div class="market-detail-version-row">
-						<span class="market-detail-version-label"
-							>{t("market.detail.version")}</span
+					</div>
+				{/if}
+
+				<div class="market-detail-actions">
+					{#if project.installed}
+						{#if source === "local"}
+							<span class="market-detail-installed-label">
+								{project.installed.version
+									? `v${project.installed.version}`
+									: t("market.detail.installedLabel")}
+							</span>
+							<button
+								type="button"
+								class="market-detail-btn secondary"
+								onclick={onToggleEnabled}
+							>
+								{project.disabled
+									? t("market.detail.enable")
+									: t("market.detail.disable")}
+							</button>
+							<button
+								type="button"
+								class="market-detail-btn danger"
+								onclick={onUninstall}
+							>
+								{t("market.detail.uninstall")}
+							</button>
+						{:else}
+							<span class="market-detail-installed-label">
+								{t("market.detail.installedLabel")}
+							</span>
+						{/if}
+					{:else if selectedVersion}
+						<button
+							type="button"
+							class="market-detail-btn primary"
+							disabled={installing ||
+								(contentType !== "mods" &&
+									!selectedVersion.primaryFileUrl)}
+							onclick={handleInstall}
 						>
-						<Dropdown
-							value={selectedVersion?.id ?? ""}
-							options={versionOptions}
-							placeholder={t("market.detail.selectVersion")}
-							onchange={(value) => {
-								const version = detail.versions.find(
-									(v) => v.id === value,
-								);
-								if (version) onVersionSelect(version);
-							}}
-						/>
+							{#if installing}
+								<Loading class="detail-version-spinner" />
+							{/if}
+							{t("market.detail.install")}
+						</button>
+					{/if}
+				</div>
+
+				{#if actionError}
+					<p class="market-detail-action-error" role="alert">
+						{actionError}
+					</p>
+				{/if}
+
+				{#if project.source !== "local"}
+					<button
+						type="button"
+						class="market-detail-open-link"
+						onclick={openProjectUrl}
+					>
+						<Icon name="instance:external-link" size={14} />
+						{project.source === "curseforge"
+							? t("market.detail.openOnCurseForge")
+							: t("market.detail.openOnModrinth")}
+					</button>
+				{/if}
+			</aside>
+
+			<div class="market-detail-content">
+				{#if project.source !== "curseforge" && (detail.fullProject as ModrinthProjectFull)?.categories?.length}
+					<div class="market-detail-tags">
+						{#each (detail.fullProject as ModrinthProjectFull).categories as category (category)}
+							<span class="market-detail-tag">{category}</span>
+						{/each}
+					</div>
+				{/if}
+				{#if project.description}
+					<p class="market-detail-description">
+						{project.description}
+					</p>
+				{/if}
+
+				{#if bodySource || curseforgeBodySource}
+					<div class="market-detail-readme">
+						<h4 class="market-detail-section-title">
+							{t("market.detail.readme")}
+						</h4>
+						{#if project.source === "curseforge"}
+							<HtmlRenderer
+								source={curseforgeBodySource}
+								onLinkClick={openUrl}
+							/>
+						{:else}
+							<MarkdownRenderer
+								source={bodySource}
+								baseUrl={readmeBaseUrl}
+								onLinkClick={openUrl}
+							/>
+						{/if}
 					</div>
 				{/if}
 			</div>
-		{/if}
-
-		<div class="market-detail-actions">
-			{#if project.installed}
-				{#if source === "local"}
-					<span class="market-detail-installed-label">
-						{project.installed.version
-							? `v${project.installed.version}`
-							: t("market.detail.installedLabel")}
-					</span>
-					<button
-						type="button"
-						class="market-detail-btn secondary"
-						onclick={onToggleEnabled}
-					>
-						{project.disabled
-							? t("market.detail.enable")
-							: t("market.detail.disable")}
-					</button>
-					<button
-						type="button"
-						class="market-detail-btn danger"
-						onclick={onUninstall}
-					>
-						{t("market.detail.uninstall")}
-					</button>
-				{:else}
-					<span class="market-detail-installed-label">
-						{t("market.detail.installedLabel")}
-					</span>
-				{/if}
-			{:else if selectedVersion}
-				<button
-					type="button"
-					class="market-detail-btn primary"
-					disabled={installing ||
-						(contentType !== "mods" &&
-							!selectedVersion.primaryFileUrl)}
-					onclick={handleInstall}
-				>
-					{#if installing}
-						<Loading class="detail-version-spinner" />
-					{/if}
-					{t("market.detail.install")}
-				</button>
-			{/if}
 		</div>
-
-		{#if actionError}
-			<p class="market-detail-action-error">{actionError}</p>
-		{/if}
-
-		{#if project.description}
-			<p class="market-detail-description">{project.description}</p>
-		{/if}
-
-		{#if bodySource || curseforgeBodySource}
-			<div class="market-detail-readme">
-				<h4 class="market-detail-section-title">
-					{t("market.detail.readme")}
-				</h4>
-				{#if project.source === "curseforge"}
-					<HtmlRenderer
-						source={curseforgeBodySource}
-						onLinkClick={openUrl}
-					/>
-				{:else}
-					<MarkdownRenderer
-						source={bodySource}
-						baseUrl={readmeBaseUrl}
-						onLinkClick={openUrl}
-					/>
-				{/if}
-			</div>
-		{/if}
-
-		{#if project.source !== "local"}
-			<button
-				type="button"
-				class="market-detail-open-link"
-				onclick={openProjectUrl}
-			>
-				{project.source === "curseforge"
-					? t("market.detail.openOnCurseForge")
-					: t("market.detail.openOnModrinth")}
-			</button>
-		{/if}
 	</div>
-
-	{#if detail.loading && !detail.fullProject && detail.versions.length === 0}
-		<div class="market-detail-loading">
-			<span class="spinner"></span>
-		</div>
-	{/if}
 </div>
 
 <MarketDependenciesModal
@@ -425,16 +471,22 @@
 	}
 
 	.market-detail-header {
-		position: absolute;
-		top: 14px;
-		right: 14px;
-		z-index: 2;
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		flex-wrap: wrap;
+		gap: 10px;
+		padding: 12px 24px;
+		border-bottom: 1px solid var(--border);
+		flex-shrink: 0;
 	}
 
 	.market-detail-close {
-		width: 28px;
-		height: 28px;
-		background: rgba(255, 255, 255, 0.05);
+		padding: 7px 10px;
+		font: inherit;
+		font-size: 0.8rem;
+		gap: 6px;
+		background: transparent;
 		border: 1px solid var(--border);
 		color: var(--text-secondary);
 		border-radius: var(--border-radius-sm);
@@ -442,29 +494,75 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		transition: all 0.15s;
+		transition:
+			background-color 0.15s,
+			color 0.15s;
 	}
 
 	.market-detail-close:hover {
-		background: rgba(255, 255, 255, 0.1);
+		background: var(--surface-hover);
 		color: var(--text-primary);
 	}
 
 	.market-detail-scroll {
 		flex: 1;
+		min-height: 0;
 		overflow-y: auto;
-		padding: 20px 16px;
+		padding: 24px;
 		display: flex;
 		flex-direction: column;
-		gap: 14px;
+		gap: 24px;
+	}
+
+	.market-detail-hero {
+		display: flex;
+		align-items: center;
+		gap: 18px;
+	}
+
+	.market-detail-identity {
+		min-width: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+	}
+
+	.market-detail-columns {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) 270px;
+		align-items: start;
+		gap: 24px;
+	}
+
+	.market-detail-sidebar {
+		grid-column: 2;
+		grid-row: 1;
+		min-width: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 16px;
+		padding: 16px;
+		background: var(--surface-selected);
+		border: 1px solid var(--border);
+		border-radius: var(--border-radius-sm);
+	}
+
+	.market-detail-content {
+		grid-column: 1;
+		grid-row: 1;
+		min-width: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 20px;
+		overflow-wrap: anywhere;
 	}
 
 	.market-detail-icon {
 		width: 80px;
 		height: 80px;
-		margin: 8px auto 0;
+		flex-shrink: 0;
 		border-radius: var(--border-radius-sm);
-		background: rgba(255, 255, 255, 0.03);
+		background: var(--surface-selected);
 		border: 1px solid var(--border);
 		overflow: hidden;
 		display: flex;
@@ -476,22 +574,20 @@
 	.market-detail-icon img {
 		width: 100%;
 		height: 100%;
-		object-fit: cover;
-		image-rendering: pixelated;
+		object-fit: contain;
 	}
 
 	.market-detail-title {
-		font-size: 1rem;
+		font-size: 1.5rem;
 		font-weight: 700;
 		color: var(--text-primary);
-		text-align: center;
+		overflow-wrap: anywhere;
 		margin: 0;
 	}
 
 	.market-detail-author {
-		font-size: 0.75rem;
+		font-size: 0.85rem;
 		color: var(--text-secondary);
-		text-align: center;
 		margin: 0;
 	}
 
@@ -502,11 +598,8 @@
 	}
 
 	.market-detail-stat {
-		background: rgba(255, 255, 255, 0.03);
-		border: 1px solid var(--border);
-		border-radius: var(--border-radius-sm);
-		padding: 8px 6px;
-		text-align: center;
+		padding-bottom: 14px;
+		border-bottom: 1px solid var(--border);
 	}
 
 	.market-detail-stat-label {
@@ -519,7 +612,8 @@
 	}
 
 	.market-detail-stat-value {
-		font-size: 0.9rem;
+		font-size: 1.15rem;
+		font-variant-numeric: tabular-nums;
 		font-weight: 700;
 		color: var(--text-primary);
 	}
@@ -532,10 +626,10 @@
 
 	.market-detail-tag {
 		font-size: 0.68rem;
-		background: rgba(255, 255, 255, 0.04);
+		background: var(--surface-selected);
 		border: 1px solid var(--border);
 		padding: 2px 8px;
-		border-radius: 20px;
+		border-radius: var(--border-radius-sm);
 		color: var(--text-secondary);
 		text-transform: capitalize;
 	}
@@ -568,7 +662,7 @@
 		font-size: 0.78rem;
 		color: var(--text-secondary);
 		padding: 10px;
-		background: rgba(255, 255, 255, 0.02);
+		background: var(--surface-input);
 		border: 1px dashed var(--border);
 		border-radius: var(--border-radius-sm);
 	}
@@ -580,6 +674,7 @@
 
 	.market-detail-actions {
 		display: flex;
+		flex-wrap: wrap;
 		gap: 8px;
 	}
 
@@ -596,27 +691,29 @@
 		font-size: 0.78rem;
 		font-weight: 700;
 		letter-spacing: 0.3px;
-		transition: all 0.15s;
+		transition:
+			background-color 0.15s,
+			color 0.15s;
 		font-family: inherit;
 	}
 
 	.market-detail-btn.primary {
 		background: var(--accent);
-		color: var(--bg-main);
+		color: var(--accent-text);
 	}
 
 	.market-detail-btn.primary:hover:not(:disabled) {
-		filter: brightness(0.9);
+		opacity: 0.9;
 	}
 
 	.market-detail-btn.secondary {
-		background: rgba(255, 255, 255, 0.06);
+		background: var(--surface-input);
 		color: var(--text-primary);
 		border: 1px solid var(--border);
 	}
 
 	.market-detail-btn.secondary:hover {
-		background: rgba(255, 255, 255, 0.1);
+		background: var(--surface-hover);
 	}
 
 	.market-detail-btn.danger {
@@ -655,12 +752,13 @@
 		font-size: 0.75rem;
 		margin: 0;
 		text-align: center;
+		overflow-wrap: anywhere;
 	}
 
 	.market-detail-description {
-		font-size: 0.8rem;
+		font-size: 0.85rem;
 		line-height: 1.55;
-		color: var(--text-secondary);
+		color: var(--text-tertiary, var(--text-secondary));
 		margin: 0;
 	}
 
@@ -676,10 +774,16 @@
 	.market-detail-readme {
 		display: flex;
 		flex-direction: column;
-		gap: 8px;
+		gap: 16px;
+		padding-top: 20px;
+		border-top: 1px solid var(--border);
 	}
 
 	.market-detail-open-link {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 8px;
 		padding: 8px;
 		background: transparent;
 		border: 1px solid var(--border);
@@ -688,37 +792,58 @@
 		font-size: 0.75rem;
 		font-weight: 700;
 		cursor: pointer;
-		transition: all 0.15s;
+		transition:
+			background-color 0.15s,
+			color 0.15s;
 		font-family: inherit;
 	}
 
 	.market-detail-open-link:hover {
-		background: rgba(255, 255, 255, 0.05);
+		background: var(--surface-hover);
 		color: var(--text-primary);
 	}
 
 	.market-detail-loading {
-		position: absolute;
-		inset: 0;
 		display: flex;
 		align-items: center;
-		justify-content: center;
-		background: rgba(var(--bg-main), 0.8);
-		backdrop-filter: blur(2px);
+		gap: 8px;
+		color: var(--text-secondary);
+		font-size: 0.75rem;
 	}
 
-	.spinner {
-		width: 28px;
-		height: 28px;
-		border: 3px solid var(--border);
-		border-top-color: var(--accent);
-		border-radius: 50%;
-		animation: spin 0.8s linear infinite;
+	button:focus-visible {
+		outline: 2px solid var(--accent);
+		outline-offset: 3px;
 	}
 
-	@keyframes spin {
-		to {
-			transform: rotate(360deg);
+	@container market (max-width: 700px) {
+		.market-detail-header {
+			padding: 10px 14px;
+		}
+		.market-detail-scroll {
+			padding: 16px 14px;
+			gap: 18px;
+		}
+		.market-detail-columns {
+			grid-template-columns: minmax(0, 1fr);
+			gap: 20px;
+		}
+		.market-detail-sidebar,
+		.market-detail-content {
+			grid-column: auto;
+			grid-row: auto;
+		}
+		.market-detail-icon {
+			width: 60px;
+			height: 60px;
+		}
+		.market-detail-title {
+			font-size: 1.2rem;
+		}
+	}
+	@media (prefers-reduced-motion: reduce) {
+		button {
+			transition: none;
 		}
 	}
 </style>

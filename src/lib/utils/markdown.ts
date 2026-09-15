@@ -5,6 +5,8 @@ const sanitizer = DOMPurify;
 
 const DEFAULT_MAX_SOURCE_LENGTH = 120_000;
 const CACHE_MAX_SIZE = 18;
+const CACHE_MAX_BYTES = 2 * 1024 * 1024;
+let cacheBytes = 0;
 
 interface RenderOptions {
 	baseUrl?: string;
@@ -106,7 +108,11 @@ function truncateSource(source: string, maxLength: number): string {
 }
 
 function getCacheKey(source: string, options: RenderOptions): string {
-	return `${options.baseUrl ?? ""}::${options.maxLength ?? 0}::${source.length}::${source}`;
+	return JSON.stringify([
+		options.baseUrl ?? "",
+		options.maxLength ?? 0,
+		source,
+	]);
 }
 
 function getCached(key: string): string | undefined {
@@ -118,11 +124,25 @@ function getCached(key: string): string | undefined {
 }
 
 function setCache(key: string, html: string): void {
-	if (cache.size >= CACHE_MAX_SIZE) {
+	// Budget UTF-16 strings, including keys, rather than entry count alone.
+	const bytes = (key.length + html.length) * 2;
+	if (bytes > CACHE_MAX_BYTES) return;
+	const previous = cache.get(key);
+	if (previous !== undefined) {
+		cacheBytes -= (key.length + previous.length) * 2;
+		cache.delete(key);
+	}
+	while (
+		cache.size >= CACHE_MAX_SIZE ||
+		cacheBytes + bytes > CACHE_MAX_BYTES
+	) {
 		const firstKey = cache.keys().next().value as string | undefined;
-		if (firstKey) cache.delete(firstKey);
+		if (firstKey === undefined) break;
+		cacheBytes -= (firstKey.length + cache.get(firstKey)!.length) * 2;
+		cache.delete(firstKey);
 	}
 	cache.set(key, html);
+	cacheBytes += bytes;
 }
 
 function createRenderer(baseUrl?: string): Renderer {
@@ -187,12 +207,11 @@ export function renderMarkdown(
 	if (!source) return "";
 
 	const maxLength = options.maxLength ?? DEFAULT_MAX_SOURCE_LENGTH;
-	const cacheKey = getCacheKey(source, options);
+	const truncated = truncateSource(source, maxLength);
+	const cacheKey = getCacheKey(truncated, options);
 
 	const cached = getCached(cacheKey);
 	if (cached !== undefined) return cached;
-
-	const truncated = truncateSource(source, maxLength);
 
 	try {
 		const html = marked.parse(truncated, {

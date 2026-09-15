@@ -31,6 +31,7 @@
 	let containerHeight = $state(0);
 	let ticking = false;
 	let disposed = false;
+	let frame: number | undefined;
 
 	const totalHeight = $derived(items.length * itemHeight + padding);
 
@@ -49,7 +50,8 @@
 	function handleScroll(e: Event) {
 		const target = e.target as HTMLDivElement;
 		if (!ticking) {
-			requestAnimationFrame(() => {
+			frame = requestAnimationFrame(() => {
+				frame = undefined;
 				if (disposed) return;
 				scrollTop = target.scrollTop;
 				if (target.scrollHeight - scrollTop - containerHeight < 500) {
@@ -73,6 +75,7 @@
 
 	onDestroy(() => {
 		disposed = true;
+		if (frame !== undefined) cancelAnimationFrame(frame);
 	});
 </script>
 

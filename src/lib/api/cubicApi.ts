@@ -27,6 +27,7 @@ import {
 } from "../types/types";
 
 import { invoke } from "@tauri-apps/api/core";
+import { invokeMarket } from "./marketRequest";
 import { showErrorParsed, showJreInstallPrompt } from "../state/state.svelte";
 import {
 	type VersionIntegrity,
@@ -52,6 +53,16 @@ async function invokeWithFallback<T>(
 		showErrorParsed(err);
 		return fallback;
 	}
+}
+
+function invokeMarketOrFallback<T>(
+	command: string,
+	args: Record<string, unknown>,
+	signal?: AbortSignal,
+): Promise<T | undefined> {
+	return signal
+		? invokeMarket<T>(command, args, signal)
+		: invokeWithFallback<T>(command, args);
 }
 
 async function invokeWithCallback(
@@ -655,18 +666,23 @@ export async function searchModrinth(
 	limit: number = 24,
 	offset: number = 0,
 	projectType: string = "mod",
+	signal?: AbortSignal,
 ): Promise<ModrinthSearchResult | null> {
 	return (
-		(await invokeWithFallback<ModrinthSearchResult>("search_modrinth", {
-			query,
-			loader,
-			gameVersion: gameVersion || null,
-			category,
-			index,
-			limit,
-			offset,
-			projectType,
-		})) ?? null
+		(await invokeMarketOrFallback<ModrinthSearchResult>(
+			"search_modrinth",
+			{
+				query,
+				loader,
+				gameVersion: gameVersion || null,
+				category,
+				index,
+				limit,
+				offset,
+				projectType,
+			},
+			signal,
+		)) ?? null
 	);
 }
 
@@ -674,26 +690,33 @@ export async function getModrinthProjectVersions(
 	projectId: string,
 	loader?: string,
 	gameVersion?: string,
+	signal?: AbortSignal,
 ): Promise<ModrinthVersion[]> {
 	return (
-		(await invokeWithFallback<ModrinthVersion[]>(
+		(await invokeMarketOrFallback<ModrinthVersion[]>(
 			"get_modrinth_project_versions",
 			{
 				projectId,
 				loader: loader || null,
 				gameVersion: gameVersion || null,
 			},
+			signal,
 		)) ?? []
 	);
 }
 
 export async function getModrinthProject(
 	projectId: string,
+	signal?: AbortSignal,
 ): Promise<ModrinthProjectFull | null> {
 	return (
-		(await invokeWithFallback<ModrinthProjectFull>("get_modrinth_project", {
-			projectId,
-		})) ?? null
+		(await invokeMarketOrFallback<ModrinthProjectFull>(
+			"get_modrinth_project",
+			{
+				projectId,
+			},
+			signal,
+		)) ?? null
 	);
 }
 
@@ -750,37 +773,49 @@ export async function searchCurseForge(
 	index: string = "popularity",
 	limit: number = 24,
 	offset: number = 0,
+	signal?: AbortSignal,
 ): Promise<CurseForgeSearchResult | null> {
 	return (
-		(await invokeWithFallback<CurseForgeSearchResult>("search_curseforge", {
-			query,
-			loader,
-			gameVersion: gameVersion || null,
-			category: category || null,
-			index,
-			limit,
-			offset,
-		})) ?? null
+		(await invokeMarketOrFallback<CurseForgeSearchResult>(
+			"search_curseforge",
+			{
+				query,
+				loader,
+				gameVersion: gameVersion || null,
+				category: category || null,
+				index,
+				limit,
+				offset,
+			},
+			signal,
+		)) ?? null
 	);
 }
 
 export async function getCurseForgeProject(
 	modId: number,
+	signal?: AbortSignal,
 ): Promise<CurseForgeProject | null> {
 	return (
-		(await invokeWithFallback<CurseForgeProject>("get_curseforge_project", {
-			modId,
-		})) ?? null
+		(await invokeMarketOrFallback<CurseForgeProject>(
+			"get_curseforge_project",
+			{
+				modId,
+			},
+			signal,
+		)) ?? null
 	);
 }
 
 export async function getCurseForgeProjectDescription(
 	modId: number,
+	signal?: AbortSignal,
 ): Promise<string | null> {
 	return (
-		(await invokeWithFallback<string>(
+		(await invokeMarketOrFallback<string>(
 			"get_curseforge_project_description",
 			{ modId },
+			signal,
 		)) ?? null
 	);
 }
@@ -789,15 +824,17 @@ export async function getCurseForgeProjectFiles(
 	modId: number,
 	loader?: string,
 	gameVersion?: string,
+	signal?: AbortSignal,
 ): Promise<CurseForgeFile[]> {
 	return (
-		(await invokeWithFallback<CurseForgeFile[]>(
+		(await invokeMarketOrFallback<CurseForgeFile[]>(
 			"get_curseforge_project_files",
 			{
 				modId,
 				loader: loader || null,
 				gameVersion: gameVersion || null,
 			},
+			signal,
 		)) ?? []
 	);
 }

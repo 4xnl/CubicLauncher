@@ -94,6 +94,8 @@ pub fn run() {
             commands::themes::remove_theme,
             commands::themes::export_theme,
             commands::market::search_modrinth,
+            commands::market_requests::market_request,
+            commands::market_requests::cancel_market_request,
             commands::market::get_modrinth_project,
             commands::market::get_modrinth_project_versions,
             commands::market::get_modrinth_version,
