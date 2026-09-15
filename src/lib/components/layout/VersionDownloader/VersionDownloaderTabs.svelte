@@ -1,132 +1,133 @@
 <script lang="ts">
 	import Icon from "$lib/icons/Icon.svelte";
+	import { t } from "$lib/i18n";
 
 	let {
-		loaderTab = $bindable("vanilla"),
-		LOADERS = [],
+		loaderTab,
+		LOADERS,
 		onswitch,
+		idPrefix,
+		panelId,
 	}: {
 		loaderTab: string;
 		LOADERS: Array<{ value: string; label: string; iconName: string }>;
 		onswitch: (tab: string) => void;
+		idPrefix: string;
+		panelId: string;
 	} = $props();
 
-	function handleClick(value: string) {
-		loaderTab = value;
-		onswitch(value);
+	function handleKeydown(event: KeyboardEvent, index: number) {
+		let next: number;
+		switch (event.key) {
+			case "ArrowRight":
+				next = (index + 1) % LOADERS.length;
+				break;
+			case "ArrowLeft":
+				next = (index - 1 + LOADERS.length) % LOADERS.length;
+				break;
+			case "Home":
+				next = 0;
+				break;
+			case "End":
+				next = LOADERS.length - 1;
+				break;
+			default:
+				return;
+		}
+		event.preventDefault();
+		const target = event.currentTarget as HTMLButtonElement;
+		const button =
+			target.parentElement?.querySelectorAll<HTMLButtonElement>(
+				"[role=tab]",
+			)[next];
+		button?.focus();
+		button?.scrollIntoView({ block: "nearest", inline: "nearest" });
+		onswitch(LOADERS[next].value);
 	}
 </script>
 
-<div class="loader-unified">
-	{#each LOADERS as loader (loader.value)}
+<div
+	class="catalog-tabs"
+	role="tablist"
+	aria-label={t("versionDownloader.title")}
+>
+	{#each LOADERS as loader, index (loader.value)}
 		<button
 			type="button"
-			class="loader-btn"
+			role="tab"
+			id={`${idPrefix}-${loader.value}`}
+			class="catalog-tab"
 			class:active={loaderTab === loader.value}
-			title={loader.label}
-			onclick={() => handleClick(loader.value)}
+			aria-selected={loaderTab === loader.value}
+			aria-controls={panelId}
+			tabindex={loaderTab === loader.value ? 0 : -1}
+			onclick={() => onswitch(loader.value)}
+			onkeydown={(e) => handleKeydown(e, index)}
 		>
-			<span class="loader-icon-wrap">
-				<Icon name={loader.iconName} size={26} />
-			</span>
-			<span class="loader-label">{loader.label}</span>
+			<Icon name={loader.iconName} size={18} />
+			<span>{loader.label}</span>
 		</button>
 	{/each}
 </div>
 
 <style>
-	.loader-unified {
+	.catalog-tabs {
 		display: flex;
-		flex-direction: column;
-		width: 100%;
-	}
-
-	.loader-btn {
-		flex: none;
-		width: 100%;
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		justify-content: center;
-		gap: 6px;
-		padding: 12px 6px;
-		background: var(--bg-card);
-		border: 1px solid var(--border);
-		margin-top: -1px;
-		color: var(--text-secondary);
-		font-family: inherit;
-		font-size: 0.75rem;
-		font-weight: 600;
-		cursor: pointer;
-		position: relative;
-		z-index: 0;
-		transition:
-			background-color 0.15s,
-			color 0.15s,
-			border-color 0.15s,
-			box-shadow 0.15s;
-	}
-
-	.loader-btn:first-child {
-		margin-top: 0;
-		border-radius: var(--border-radius-sm) var(--border-radius-sm) 0 0;
-	}
-
-	.loader-btn:last-child {
-		border-radius: 0 0 var(--border-radius-sm) var(--border-radius-sm);
-	}
-
-	.loader-btn:hover {
-		background: var(--surface-hover);
-		color: var(--text-primary);
-		z-index: 1;
-	}
-
-	.loader-btn.active {
-		background: var(--surface-active);
-		border-color: var(--accent);
-		color: var(--text-primary);
-		z-index: 2;
-	}
-
-	.loader-icon-wrap {
-		width: 34px;
-		height: 34px;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		background: var(--surface-input);
-		border-radius: var(--border-radius-sm);
-		padding: 4px;
 		flex-shrink: 0;
-		transition: background-color 0.15s;
+		gap: 4px;
+		overflow-x: auto;
+		border-bottom: 1px solid var(--border);
+		scrollbar-width: thin;
 	}
-
-	.loader-btn:hover .loader-icon-wrap,
-	.loader-btn.active .loader-icon-wrap {
-		background: var(--bg-main);
-	}
-
-	.loader-label {
+	.catalog-tab {
+		position: relative;
+		display: flex;
+		flex: 1 0 auto;
+		align-items: center;
+		justify-content: center;
+		gap: 8px;
+		padding: 14px 12px;
+		border: 0;
+		border-radius: var(--border-radius-sm) var(--border-radius-sm) 0 0;
+		background: transparent;
+		color: var(--text-muted);
+		font: inherit;
+		font-size: 0.8rem;
+		font-weight: 600;
 		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		max-width: 100%;
+		cursor: pointer;
+		transition:
+			color 0.15s,
+			background-color 0.15s;
 	}
-
-	@media (max-width: 500px) {
-		.loader-btn {
-			padding: 10px 4px;
-			gap: 0;
-		}
-
-		.loader-label {
-			display: none;
-		}
-
-		.loader-icon-wrap {
-			width: 28px;
-			height: 28px;
+	.catalog-tab::after {
+		content: "";
+		position: absolute;
+		bottom: 0;
+		left: 12px;
+		right: 12px;
+		height: 3px;
+		border-radius: 3px 3px 0 0;
+		background: transparent;
+	}
+	.catalog-tab:hover {
+		color: var(--text-primary);
+		background: var(--surface-hover);
+	}
+	.catalog-tab.active {
+		color: var(--text-primary);
+		background: rgba(var(--accent-rgb), 0.06);
+	}
+	.catalog-tab.active::after {
+		background: var(--accent);
+	}
+	.catalog-tab:focus-visible {
+		outline: 2px solid var(--accent);
+		outline-offset: -3px;
+	}
+	@media (max-width: 600px) {
+		.catalog-tab {
+			padding: 12px 10px;
 		}
 	}
 </style>
