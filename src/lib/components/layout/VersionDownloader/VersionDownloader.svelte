@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { onMount } from "svelte";
-
+	import { onMount, untrack } from "svelte";
+	import { SvelteSet } from "svelte/reactivity";
 	import {
 		getAvailableVersions,
 		addToQueue,
@@ -17,19 +17,16 @@
 		refreshAvailableVersions,
 		refreshForgeVersions,
 		refreshNeoForgeVersions,
+		getOptiFineVersions,
+		downloadOptiFine,
 	} from "$lib/api/cubicApi";
 	import {
 		versionsState,
 		loadInstalledVersions,
 		invalidateInstalledVersions,
 	} from "$lib/state/versionsState.svelte";
-	import type {
-		MinecraftVersion,
-		ForgeGameVersion,
-		NeoForgeGameVersion,
-	} from "$lib/types/types";
+	import type { MinecraftVersion } from "$lib/types/types";
 	import { onAppEvent } from "$lib/api/launcherService";
-	import { SvelteSet } from "svelte/reactivity";
 	import { isVersionDownloading } from "$lib/state/downloadState.svelte";
 	import { launcherStore } from "$lib/state/state.svelte";
 	import { t } from "$lib/i18n";
@@ -38,906 +35,989 @@
 	import VirtualList from "../VirtualList.svelte";
 	import VersionDownloaderTabs from "./VersionDownloaderTabs.svelte";
 	import Icon from "$lib/icons/Icon.svelte";
-	import Tooltip from "$lib/components/ui/Tooltip.svelte";
+	import {
+		compareVersions,
+		createCatalogCache,
+		groupLoaderVersions,
+		sortLoaderVersions,
+		type LoaderDisplayItem,
+		type GroupedLoaderVersions,
+	} from "./versionCatalog";
 
 	let { open = $bindable(false) }: { open: boolean } = $props();
-
-	let tooltipOpen = $state(false);
-	let tooltipX = $state(0);
-	let tooltipY = $state(0);
-	let tooltipText = $state("");
-
-	function showStableTooltip(e: MouseEvent | FocusEvent, text: string) {
-		const target = e.currentTarget as HTMLElement;
-		const rect = target.getBoundingClientRect();
-		tooltipX = rect.right;
-		tooltipY = rect.top;
-		tooltipText = text;
-		tooltipOpen = true;
-	}
-
-	function hideStableTooltip() {
-		tooltipOpen = false;
-	}
-
+	const id = $props.id();
 	const LOADERS = [
-		{
-			value: "vanilla",
-			label: "Vanilla",
-			iconName: "brand:vanilla",
-		},
-		{
-			value: "fabric",
-			label: "Fabric",
-			iconName: "brand:fabric",
-		},
-		{
-			value: "forge",
-			label: "Forge",
-			iconName: "brand:forge",
-		},
-		{
-			value: "neoforge",
-			label: "NeoForge",
-			iconName: "brand:neoforged",
-		},
-		{
-			value: "quilt",
-			label: "Quilt",
-			iconName: "brand:quilt",
-		},
+		{ value: "vanilla", label: "Vanilla", iconName: "brand:vanilla" },
+		{ value: "fabric", label: "Fabric", iconName: "brand:fabric" },
+		{ value: "forge", label: "Forge", iconName: "brand:forge" },
+		{ value: "neoforge", label: "NeoForge", iconName: "brand:neoforged" },
+		{ value: "quilt", label: "Quilt", iconName: "brand:quilt" },
+		{ value: "optifine", label: "OptiFine", iconName: "brand:optifine" },
 	];
+	interface CatalogItem {
+		id: string;
+		title: string;
+		subtitle: string;
+		badge: string;
+		stable: boolean;
+		searchText: string;
+		loader?: LoaderDisplayItem;
+	}
 
 	let loaderTab = $state("vanilla");
+	const activeLoader = $derived(
+		LOADERS.find((loader) => loader.value === loaderTab)!,
+	);
+	const isForge = $derived(loaderTab === "forge" || loaderTab === "neoforge");
 	let refreshing = $state(false);
-
-	// --- Vanilla tab state ---
-	let vanillaSearch = $state("");
+	let sourceError = $state<string | null>(null);
+	const enqueueing = new SvelteSet<string>();
+	let search = $state("");
+	const showUnstable = $derived(launcherStore.settings.show_unstable_loaders);
+	const showSnapshots = $derived(launcherStore.settings.show_snapshots);
 	let loadingMojang = $state(false);
-	let loadingVanillaInstalled = $derived(versionsState.loading);
-
-	// --- Loader tabs state (fabric, forge, neoforge, quilt) ---
-	let mcVersions = $state<string[]>([]);
+	let vanillaCache = $state<MinecraftVersion[] | null>(null);
+	let allMcVersions = $state<string[]>([]);
+	let activeCatalog = $state<GroupedLoaderVersions | null>(null);
+	const mcVersions = $derived(
+		loaderTab === "optifine" && !showUnstable
+			? (activeCatalog?.stableGameVersions ?? [])
+			: allMcVersions,
+	);
 	let selectedMcVersion = $state("");
 	let loaderItems = $state<LoaderDisplayItem[]>([]);
 	let loadingMinecraft = $state(false);
 	let loadingLoader = $state(false);
-	let mcLoadId = $state(0);
-	let loaderLoadId = $state(0);
+	let mcLoadId = 0;
+	let loaderLoadId = 0;
+	const groupedCache = createCatalogCache<GroupedLoaderVersions>();
+	const gameCache = createCatalogCache<string[]>();
+	const remoteLoaderCache = {
+		fabric: createCatalogCache<LoaderDisplayItem[]>(),
+		quilt: createCatalogCache<LoaderDisplayItem[]>(),
+	};
+	const loading = $derived(
+		loaderTab === "vanilla"
+			? loadingMojang || versionsState.loading
+			: loadingMinecraft || loadingLoader || versionsState.loading,
+	);
 
-	// --- Cached full lists for forge/neoforge ---
-	let forgeCache = $state<ForgeGameVersion[]>([]);
-	let neoForgeCache = $state<NeoForgeGameVersion[]>([]);
-
-	let loaderSearch = $state("");
-
-	// --- Vanilla manifest cache for "Show all" ---
-	let vanillaAllCache = $state<MinecraftVersion[] | null>(null);
-
-	interface LoaderDisplayItem {
-		version_id: string;
-		display_version: string;
-		game_version: string;
-		stable: boolean;
-	}
-
-	// --- Helpers ---
-
-	function compareVersions(a: string, b: string): number {
-		const aParts = a.split(".").map((n) => parseInt(n, 10) || 0);
-		const bParts = b.split(".").map((n) => parseInt(n, 10) || 0);
-		for (let i = 0; i < Math.max(aParts.length, bParts.length); i++) {
-			const av = aParts[i] ?? 0;
-			const bv = bParts[i] ?? 0;
-			if (av !== bv) return bv - av;
+	function formatSourceError(error: unknown): string {
+		const message = String(error);
+		try {
+			const parsed = JSON.parse(message);
+			if (typeof parsed.code === "string") {
+				return t(`errors.${parsed.code}`, parsed.params ?? {});
+			}
+		} catch {
+			// Network/runtime errors may not use the backend's JSON error format.
 		}
-		return b.localeCompare(a, undefined, { numeric: true });
+		return message;
 	}
 
-	// --- Tab switching ---
-
-	async function switchTab(tab: string) {
+	async function switchTab(tab: string, preferredMc = "", refresh = false) {
+		if (tab === loaderTab && !refresh) return;
+		if (loaderTab !== tab) search = "";
 		loaderTab = tab;
-		if (tab === "vanilla") return;
-
-		const currentLoadId = ++mcLoadId;
+		sourceError = null;
+		const request = ++mcLoadId;
 		++loaderLoadId;
+		if (tab === "vanilla") {
+			if (!vanillaCache && !loadingMojang) await loadVanilla();
+			return;
+		}
 		loadingMinecraft = true;
 		loadingLoader = true;
-		mcVersions = [];
+		allMcVersions = [];
+		activeCatalog = null;
 		loaderItems = [];
 		selectedMcVersion = "";
-		loaderSearch = "";
-
 		try {
 			await loadInstalledVersions();
-			if (currentLoadId !== mcLoadId) return;
-
-			let mcList: string[] = [];
-
-			if (tab === "forge") {
-				if (forgeCache.length === 0)
-					forgeCache = await getForgeVersions();
-				const seen = new SvelteSet<string>();
-				for (const v of forgeCache) {
-					if (v.game_version && !seen.has(v.game_version)) {
-						seen.add(v.game_version);
-						mcList.push(v.game_version);
-					}
-				}
-			} else if (tab === "neoforge") {
-				if (neoForgeCache.length === 0)
-					neoForgeCache = await getNeoForgeVersions();
-				const seen = new SvelteSet<string>();
-				for (const v of neoForgeCache) {
-					if (v.game_version && !seen.has(v.game_version)) {
-						seen.add(v.game_version);
-						mcList.push(v.game_version);
-					}
-				}
+			if (request !== mcLoadId) return;
+			if (tab === "forge" || tab === "neoforge" || tab === "optifine") {
+				const catalog = await groupedCache.get(
+					tab,
+					async () => {
+						if (tab === "forge") {
+							const list = await (refresh
+								? refreshForgeVersions()
+								: getForgeVersions());
+							return groupLoaderVersions(
+								list.map((v) => ({
+									...v,
+									display_version: v.forge_version,
+								})),
+							);
+						}
+						if (tab === "neoforge") {
+							const list = await (refresh
+								? refreshNeoForgeVersions()
+								: getNeoForgeVersions());
+							return groupLoaderVersions(
+								list.map((v) => ({
+									...v,
+									display_version: v.neoforge_version,
+								})),
+							);
+						}
+						const list = await getOptiFineVersions(refresh);
+						return groupLoaderVersions(
+							list.map((v) => ({
+								...v,
+								display_version: v.optifine_version,
+							})),
+						);
+					},
+					refresh,
+				);
+				if (request !== mcLoadId) return;
+				activeCatalog = catalog;
+				allMcVersions = catalog.gameVersions;
 			} else {
-				const list =
-					tab === "fabric"
-						? await getFabricVersions()
-						: await getQuiltVersions();
-				const seen = new SvelteSet<string>();
-				for (const v of list) {
-					if (v.version && v.stable && !seen.has(v.version)) {
-						seen.add(v.version);
-						mcList.push(v.version);
-					}
-				}
+				const mcList = await gameCache.get(
+					tab,
+					async () => {
+						const list =
+							tab === "fabric"
+								? await getFabricVersions()
+								: await getQuiltVersions();
+						return [
+							...new SvelteSet(
+								list
+									.filter((v) => v.stable && v.version)
+									.map((v) => v.version),
+							),
+						].sort(compareVersions);
+					},
+					refresh,
+				);
+				if (request !== mcLoadId) return;
+				allMcVersions = mcList;
 			}
-
-			if (currentLoadId !== mcLoadId) return;
-			mcList.sort(compareVersions);
-			mcVersions = mcList;
-			if (mcList.length > 0) {
-				selectedMcVersion = mcList[0];
+			if (request !== mcLoadId) return;
+			if (mcVersions.length) {
+				selectedMcVersion = mcVersions.includes(preferredMc)
+					? preferredMc
+					: mcVersions[0];
 				await loadLoaderVersions(selectedMcVersion, tab);
-			} else {
-				loadingLoader = false;
-			}
-		} catch {
-			if (currentLoadId !== mcLoadId) return;
+			} else loadingLoader = false;
+		} catch (error) {
+			if (request !== mcLoadId) return;
+			sourceError = formatSourceError(error);
+			loadingLoader = false;
 		} finally {
-			if (currentLoadId === mcLoadId) {
-				loadingMinecraft = false;
-			}
+			if (request === mcLoadId) loadingMinecraft = false;
 		}
 	}
 
-	async function loadLoaderVersions(mcVersion: string, loader: string) {
-		const currentLoadId = ++loaderLoadId;
+	async function loadLoaderVersions(mc: string, loader: string) {
+		const request = ++loaderLoadId;
 		loadingLoader = true;
 		loaderItems = [];
-
+		sourceError = null;
 		try {
 			let items: LoaderDisplayItem[] = [];
-
-			const showUnstable = launcherStore.settings.show_unstable_loaders;
-
-			if (loader === "fabric") {
-				const list = await getFabricLoaderVersions(mcVersion);
-				for (const lv of list.filter((v) => showUnstable || v.stable)) {
-					const vid = `fabric-loader-${lv.version}-${mcVersion}`;
-					items.push({
-						version_id: vid,
-						display_version: lv.version,
-						game_version: mcVersion,
-						stable: lv.stable,
-					});
-				}
-			} else if (loader === "quilt") {
-				const list = await getQuiltLoaderVersions(mcVersion);
-				for (const lv of list.filter((v) => showUnstable || v.stable)) {
-					const vid = `quilt-loader-${lv.version}-${mcVersion}`;
-					items.push({
-						version_id: vid,
-						display_version: lv.version,
-						game_version: mcVersion,
-						stable: lv.stable,
-					});
-				}
-			} else if (loader === "forge") {
-				for (const v of forgeCache) {
-					if (
-						v.game_version !== mcVersion ||
-						!(showUnstable || v.stable)
-					)
-						continue;
-					items.push({
-						version_id: v.version_id,
-						display_version: v.forge_version,
-						game_version: mcVersion,
-						stable: v.stable,
-					});
-				}
-			} else if (loader === "neoforge") {
-				for (const v of neoForgeCache) {
-					if (
-						v.game_version !== mcVersion ||
-						!(showUnstable || v.stable)
-					)
-						continue;
-					items.push({
-						version_id: v.version_id,
-						display_version: v.neoforge_version,
-						game_version: mcVersion,
-						stable: v.stable,
-					});
-				}
+			if (loader === "fabric" || loader === "quilt") {
+				items = await remoteLoaderCache[loader].get(mc, async () => {
+					const list =
+						loader === "fabric"
+							? await getFabricLoaderVersions(mc)
+							: await getQuiltLoaderVersions(mc);
+					return sortLoaderVersions(
+						list.map((v) => ({
+							version_id: `${loader}-loader-${v.version}-${mc}`,
+							display_version: v.version,
+							game_version: mc,
+							stable: v.stable,
+						})),
+					);
+				});
+			} else {
+				items = activeCatalog?.byGame.get(mc) ?? [];
 			}
-
-			if (currentLoadId !== loaderLoadId) return;
-
-			items.sort(
-				(a, b) =>
-					Number(b.stable) - Number(a.stable) ||
-					compareVersions(a.display_version, b.display_version),
-			);
+			if (request !== loaderLoadId) return;
 			loaderItems = items;
-		} catch {
-			if (currentLoadId !== loaderLoadId) return;
+		} catch (error) {
+			if (request === loaderLoadId)
+				sourceError = formatSourceError(error);
 		} finally {
-			if (currentLoadId === loaderLoadId) loadingLoader = false;
+			if (request === loaderLoadId) loadingLoader = false;
 		}
 	}
 
-	// --- Vanilla tab ---
+	// Settings can hide a preview-only Minecraft version while the modal is mounted.
+	$effect(() => {
+		if (
+			loaderTab !== "optifine" ||
+			loadingMinecraft ||
+			!activeCatalog ||
+			(!selectedMcVersion && mcVersions.length === 0) ||
+			mcVersions.includes(selectedMcVersion)
+		)
+			return;
+		const mc = mcVersions[0] ?? "";
+		untrack(() => {
+			selectedMcVersion = mc;
+			void loadLoaderVersions(mc, "optifine");
+		});
+	});
 
-	async function loadVanillaInstalled() {
-		await loadInstalledVersions();
-	}
-
-	async function loadAllVanillaVersions() {
-		if (vanillaAllCache) return;
+	async function loadVanilla(refresh = false) {
 		loadingMojang = true;
 		try {
-			vanillaAllCache = await getAvailableVersions();
-		} catch {
-			// ignore
+			vanillaCache = await (refresh
+				? refreshAvailableVersions()
+				: getAvailableVersions());
+		} catch (error) {
+			if (loaderTab === "vanilla") sourceError = formatSourceError(error);
 		} finally {
 			loadingMojang = false;
 		}
 	}
 
-	const normalizedVanillaSearch = $derived(
-		vanillaSearch.trim().toLowerCase(),
-	);
-
-	const vanillaDisplayList = $derived.by(() => {
-		if (!vanillaAllCache) return [];
-		return vanillaAllCache.filter((v) => {
-			if (
-				normalizedVanillaSearch &&
-				!v.id.toLowerCase().includes(normalizedVanillaSearch)
-			)
-				return false;
-			if (!launcherStore.settings.show_snapshots && v.type === "snapshot")
-				return false;
-			if (
-				!launcherStore.settings.show_alpha &&
-				(v.type === "old_alpha" || v.type === "old_beta")
-			)
-				return false;
-			return true;
-		});
-	});
-
-	// --- Downloads ---
-
-	async function handleDownloadVanilla(versionId: string) {
-		await addToQueue(versionId);
-		invalidateInstalledVersions();
+	async function refreshCurrentSource() {
+		if (refreshing) return;
+		refreshing = true;
+		sourceError = null;
+		const tab = loaderTab;
+		const mc = selectedMcVersion;
+		try {
+			if (tab === "vanilla") await loadVanilla(true);
+			else {
+				if (tab === "fabric" || tab === "quilt")
+					remoteLoaderCache[tab].clear();
+				await switchTab(tab, mc, true);
+			}
+			await loadInstalledVersions(true);
+		} catch (error) {
+			if (loaderTab === tab) sourceError = formatSourceError(error);
+		} finally {
+			refreshing = false;
+		}
 	}
 
-	async function handleDownloadLoader(item: LoaderDisplayItem) {
-		const mc = item.game_version;
-		const lv = item.display_version;
-		if (loaderTab === "fabric") {
-			await downloadFabric(mc, lv);
-		} else if (loaderTab === "quilt") {
-			await downloadQuilt(mc, lv);
-		} else if (loaderTab === "forge") {
-			await downloadForge(mc, lv);
-		} else if (loaderTab === "neoforge") {
-			await downloadNeoForge(mc, lv);
+	async function handleDownload(item: CatalogItem) {
+		if (enqueueing.has(item.id) || isVersionDownloading(item.id)) return;
+		enqueueing.add(item.id);
+		try {
+			if (!item.loader) await addToQueue(item.id);
+			else {
+				const { game_version: mc, display_version: version } =
+					item.loader;
+				if (loaderTab === "fabric") await downloadFabric(mc, version);
+				else if (loaderTab === "quilt")
+					await downloadQuilt(mc, version);
+				else if (loaderTab === "forge")
+					await downloadForge(mc, version);
+				else if (loaderTab === "neoforge")
+					await downloadNeoForge(mc, version);
+				else if (loaderTab === "optifine")
+					await downloadOptiFine(mc, version);
+			}
+			invalidateInstalledVersions();
+		} catch {
+			// The API displays download errors and the button becomes available for retry.
+		} finally {
+			enqueueing.delete(item.id);
 		}
-		invalidateInstalledVersions();
 	}
 
 	const mcVersionOptions = $derived(
 		mcVersions.map((v) => ({ value: v, label: v })),
 	);
-
-	const mcPlaceholder = $derived(
-		!loadingMinecraft && mcVersions.length === 0
-			? t("versionDownloader.notFound")
-			: t("createInstance.selectMcVersion"),
+	const normalizedSearch = $derived(
+		search.trim().toLowerCase().replaceAll("_", " "),
+	);
+	const catalogItems = $derived.by((): CatalogItem[] => {
+		if (loaderTab === "vanilla") {
+			return (vanillaCache ?? [])
+				.filter((v) => {
+					if (!showSnapshots && v.type === "snapshot") return false;
+					return (
+						launcherStore.settings.show_alpha ||
+						(v.type !== "old_alpha" && v.type !== "old_beta")
+					);
+				})
+				.map((v) => {
+					const subtitle = new Date(
+						v.releaseTime,
+					).toLocaleDateString();
+					return {
+						id: v.id,
+						title: v.id,
+						subtitle,
+						stable: v.type === "release",
+						searchText: `${v.id} ${subtitle}`.toLowerCase(),
+						badge: t(
+							`versionDownloader.${v.type === "release" ? "stable" : v.type === "snapshot" ? "preview" : "historical"}`,
+						),
+					};
+				});
+		}
+		return loaderItems
+			.filter((item) => showUnstable || item.stable)
+			.map((item) => ({
+				id: item.version_id,
+				title: item.display_version.replaceAll("_", " "),
+				subtitle: `Minecraft ${item.game_version}`,
+				stable: item.stable,
+				searchText:
+					`${item.display_version.replaceAll("_", " ")} Minecraft ${item.game_version}`.toLowerCase(),
+				loader: item,
+				badge: t(
+					`versionDownloader.${item.stable ? (isForge ? "recommended" : "stable") : isForge ? "otherBuild" : "preview"}`,
+				),
+			}));
+	});
+	const filteredItems = $derived(
+		normalizedSearch
+			? catalogItems.filter((item) =>
+					item.searchText.includes(normalizedSearch),
+				)
+			: catalogItems,
+	);
+	const installedVersions = $derived(
+		new Set(versionsState.rawVersions ?? []),
+	);
+	const installedCount = $derived(
+		filteredItems.reduce(
+			(count, item) => count + Number(installedVersions.has(item.id)),
+			0,
+		),
 	);
 
-	const normalizedLoaderSearch = $derived(loaderSearch.trim().toLowerCase());
-
-	const filteredLoaderItems = $derived.by(() => {
-		if (!normalizedLoaderSearch) return loaderItems;
-		return loaderItems.filter(
-			(item) =>
-				item.display_version
-					.toLowerCase()
-					.includes(normalizedLoaderSearch) ||
-				item.game_version
-					.toLowerCase()
-					.includes(normalizedLoaderSearch),
-		);
-	});
-
-	// --- Refresh ---
-
-	async function refreshCurrentSource() {
-		if (loaderTab === "vanilla") {
-			refreshing = true;
-			try {
-				vanillaAllCache = await refreshAvailableVersions();
-				await loadVanillaInstalled();
-			} finally {
-				refreshing = false;
-			}
-		} else if (loaderTab === "fabric" || loaderTab === "quilt") {
-			refreshing = true;
-			try {
-				await loadLoaderVersions(selectedMcVersion, loaderTab);
-			} finally {
-				refreshing = false;
-			}
-		} else if (loaderTab === "forge") {
-			refreshing = true;
-			try {
-				forgeCache = await refreshForgeVersions();
-				await switchTab("forge");
-			} finally {
-				refreshing = false;
-			}
-		} else if (loaderTab === "neoforge") {
-			refreshing = true;
-			try {
-				neoForgeCache = await refreshNeoForgeVersions();
-				await switchTab("neoforge");
-			} finally {
-				refreshing = false;
-			}
-		}
-	}
-
-	// --- Lifecycle ---
-
 	onMount(() => {
-		loadVanillaInstalled();
-		loadAllVanillaVersions();
-
-		const unsubFinish = onAppEvent("DFinish", async () => {
-			await loadVanillaInstalled();
-			if (loaderTab !== "vanilla") {
-				await loadLoaderVersions(selectedMcVersion, loaderTab);
-			}
+		loadInstalledVersions();
+		loadVanilla();
+		return onAppEvent("DFinish", () => {
+			loadInstalledVersions(true);
 		});
-
-		return () => {
-			unsubFinish();
-		};
 	});
 </script>
 
-<ModalBase bind:open title={t("versionDownloader.title")} width="700px">
-	<div class="version-downloader-body">
-		<div class="vd-header">
-			<button
-				type="button"
-				class="vd-refresh-btn"
-				onclick={refreshCurrentSource}
-				disabled={refreshing}
-				title={t("versionDownloader.refreshBtn")}
+<ModalBase bind:open title={t("versionDownloader.title")} width="800px">
+	{#snippet headerActions()}
+		<button
+			type="button"
+			class="refresh-btn"
+			onclick={refreshCurrentSource}
+			disabled={refreshing || loading}
+			aria-label={t("versionDownloader.refreshBtn")}
+			title={t("versionDownloader.refreshBtn")}
+		>
+			<span class:spin={refreshing}
+				><Icon name="ui:refresh" size={17} /></span
 			>
-				<svg
-					width="16"
-					height="16"
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="currentColor"
-					stroke-width="2"
-					stroke-linecap="round"
-					stroke-linejoin="round"
-					class:spin={refreshing}
-				>
-					<polyline points="23 4 23 10 17 10"></polyline>
-					<path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
-				</svg>
-			</button>
-		</div>
-
-		<div class="vd-layout">
-			<div class="vd-loader-sidebar">
-				<VersionDownloaderTabs
-					bind:loaderTab
-					{LOADERS}
-					onswitch={switchTab}
-				/>
+		</button>
+	{/snippet}
+	<div class="version-catalog">
+		<VersionDownloaderTabs
+			{loaderTab}
+			{LOADERS}
+			onswitch={switchTab}
+			idPrefix={id}
+			panelId={`${id}-panel`}
+		/>
+		<div
+			class="catalog-panel"
+			id={`${id}-panel`}
+			role="tabpanel"
+			aria-labelledby={`${id}-${loaderTab}`}
+			tabindex="0"
+		>
+			<div class="source-heading">
+				<div class="source-icon">
+					<Icon name={activeLoader.iconName} size={38} />
+				</div>
+				<div>
+					<h2>{activeLoader.label}</h2>
+					<p>{t(`versionDownloader.descriptions.${loaderTab}`)}</p>
+				</div>
 			</div>
 
-			<div class="vd-content">
-				{#if loaderTab === "vanilla"}
-					<div class="vd-tab-content">
-						<div class="vd-search">
+			<div class="catalog-filters">
+				<div class="filter-row">
+					{#if loaderTab !== "vanilla"}
+						<div
+							class="mc-filter"
+							role="group"
+							aria-labelledby={`${id}-mc-label`}
+						>
+							<span class="filter-label" id={`${id}-mc-label`}
+								>Minecraft</span
+							>
+							<Select
+								bind:value={selectedMcVersion}
+								options={mcVersionOptions}
+								placeholder={t(
+									"createInstance.selectMcVersion",
+								)}
+								loading={loadingMinecraft}
+								loadingPlaceholder={t("createInstance.loading")}
+								disabled={loadingMinecraft ||
+									!mcVersions.length}
+								onchange={(value) =>
+									loadLoaderVersions(value, loaderTab)}
+							/>
+						</div>
+					{/if}
+					<label class="search-filter">
+						<span class="filter-label"
+							>{t("versionDownloader.searchLabel")}</span
+						>
+						<span class="search-field">
+							<Icon name="ui:search" size={16} />
 							<input
-								type="text"
-								class="text-input"
+								type="search"
+								bind:value={search}
 								placeholder={t(
 									"versionDownloader.searchPlaceholder",
 								)}
-								bind:value={vanillaSearch}
 							/>
-						</div>
+						</span>
+					</label>
+				</div>
+			</div>
 
-						{#if loadingMojang || loadingVanillaInstalled}
-							<div class="qm-empty-state">
-								{t("versionDownloader.loading")}
-							</div>
-						{:else if vanillaDisplayList.length === 0}
-							<div class="qm-empty-state">
-								{t("versionDownloader.notFound")}
-							</div>
-						{:else}
-							<VirtualList
-								items={vanillaDisplayList}
-								itemHeight={64}
-								keyFn={(v) => v.id}
-								class="vd-virtual-list"
-							>
-								{#snippet children(vitem)}
-									{@const vid = vitem.id}
-									{@const isVanInstalled =
-										versionsState.mcVersions?.vanilla.has(
-											vid,
-										) ?? false}
-									{@const isVanDownloading =
-										isVersionDownloading(vid)}
-									<div class="version-card">
-										<div class="version-card-info">
-											<div class="version-card-name">
-												{vid}
-											</div>
-											<div class="version-card-type">
-												{vitem.type ?? "release"} • {new Date(
-													vitem.releaseTime ?? "",
-												).toLocaleDateString()}
-											</div>
-										</div>
-										{#if isVanInstalled}
-											<div class="inst-icon">✓</div>
-										{:else if isVanDownloading}
-											<button
-												type="button"
-												class="download-btn"
-												disabled
-											>
-												<span class="dl-spinner"></span>
-												{t(
-													"versionDownloader.downloading",
-												)}
-											</button>
-										{:else}
-											<button
-												type="button"
-												class="download-btn"
-												onclick={() =>
-													handleDownloadVanilla(vid)}
-											>
-												{t(
-													"versionDownloader.downloadBtn",
-												)}
-											</button>
-										{/if}
-									</div>
-								{/snippet}
-							</VirtualList>
-						{/if}
+			<div class="results-heading" aria-live="polite">
+				<span>{t("versionDownloader.availableVersions")}</span>
+				{#if !loading && !sourceError}
+					<span class="result-count">{filteredItems.length}</span>
+					{#if installedCount > 0}<span class="installed-count"
+							>{`${installedCount} ${t(installedCount === 1 ? "versionDownloader.installedCountSingular" : "versionDownloader.installedCount")}`}</span
+						>{/if}
+				{/if}
+			</div>
+
+			<div class="catalog-results" aria-busy={loading}>
+				{#if sourceError}
+					<div class="empty-state" role="alert">
+						<Icon name="ui:error" size={30} />
+						<strong>{t("versionDownloader.loadError")}</strong>
+						<p class="error-detail">{sourceError}</p>
+						<button
+							type="button"
+							class="secondary-btn"
+							onclick={refreshCurrentSource}
+							disabled={refreshing}
+							>{t("versionDownloader.retry")}</button
+						>
+					</div>
+				{:else if loading}
+					<div class="empty-state" role="status">
+						<span class="loading-ring"></span>
+						<p>{t("versionDownloader.loading")}</p>
+					</div>
+				{:else if !filteredItems.length}
+					<div class="empty-state">
+						<Icon name="ui:search" size={30} />
+						<strong>{t("versionDownloader.notFound")}</strong>
+						<p>{t("versionDownloader.emptyHint")}</p>
+						{#if search}<button
+								type="button"
+								class="secondary-btn"
+								onclick={() => (search = "")}
+								>{t("versionDownloader.clearSearch")}</button
+							>{/if}
 					</div>
 				{:else}
-					<div class="vd-tab-content">
-						<div class="vd-controls">
-							<div class="vd-control linked-selects">
-								<Select
-									bind:value={selectedMcVersion}
-									options={mcVersionOptions}
-									placeholder={mcPlaceholder}
-									loading={loadingMinecraft}
-									loadingPlaceholder={t(
-										"createInstance.loading",
-									)}
-									disabled={loadingMinecraft ||
-										mcVersionOptions.length === 0}
-									onchange={(value) =>
-										loadLoaderVersions(value, loaderTab)}
-								/>
-							</div>
-
-							<div class="vd-control vd-search">
-								<input
-									type="text"
-									class="text-input"
-									placeholder={t(
-										"versionDownloader.loaderSearchPlaceholder",
-									)}
-									bind:value={loaderSearch}
-								/>
-							</div>
-						</div>
-
-						{#if loaderTab === "forge" || loaderTab === "neoforge"}
-							<div class="vd-hint">
-								{t(
-									loaderTab === "neoforge"
-										? "versionDownloader.neoForgeJavaHint"
-										: "versionDownloader.forgeJavaHint",
+					{#key `${loaderTab}:${selectedMcVersion}:${normalizedSearch}:${showSnapshots}:${showUnstable}:${launcherStore.settings.show_alpha}`}
+						<VirtualList
+							items={filteredItems}
+							itemHeight={78}
+							keyFn={(item) => item.id}
+							class="catalog-list"
+							padding={0}
+							hideScrollbar={false}
+						>
+							{#snippet children(item)}
+								{@const installed = installedVersions.has(
+									item.id,
 								)}
-							</div>
-						{/if}
-
-						{#if loadingLoader}
-							<div class="qm-empty-state">
-								{t("versionDownloader.loading")}
-							</div>
-						{:else if filteredLoaderItems.length === 0}
-							<div class="qm-empty-state">
-								{t("versionDownloader.notFound")}
-							</div>
-						{:else}
-							<VirtualList
-								items={filteredLoaderItems}
-								itemHeight={64}
-								keyFn={(item) => item.version_id}
-								class="vd-virtual-list"
-							>
-								{#snippet children(item)}
-									{@const isInstalled =
-										versionsState.mcVersions?.[
-											loaderTab as keyof typeof versionsState.mcVersions
-										].has(item.version_id) ?? false}
-									{@const isDownloading =
-										isVersionDownloading(item.version_id)}
-									<div class="version-card">
-										<div class="version-card-info">
-											<div class="version-card-name">
-												{#if item.stable}
-													{@const tooltipText = t(
-														"versionDownloader.stableTooltip",
-													)}
-													<span
-														class="stable-icon"
-														role="img"
-														aria-label={tooltipText}
-														onmouseenter={(e) =>
-															showStableTooltip(
-																e,
-																tooltipText,
-															)}
-														onmouseleave={hideStableTooltip}
-														onfocus={(e) =>
-															showStableTooltip(
-																e,
-																tooltipText,
-															)}
-														onblur={hideStableTooltip}
-													>
-														<Icon
-															name="ui:check-circle"
-															size={14}
-														/>
-													</span>
-												{/if}
-												{item.display_version}
-											</div>
-											<div class="version-card-type">
-												{loaderTab === "fabric"
-													? "Fabric"
-													: loaderTab === "quilt"
-														? "Quilt"
-														: loaderTab === "forge"
-															? "Forge"
-															: "NeoForge"} • MC {item.game_version}
-											</div>
-										</div>
-										{#if isInstalled}
-											<div class="inst-icon">✓</div>
-										{:else if isDownloading}
-											<button
-												type="button"
-												class="download-btn"
-												disabled
-											>
-												<span class="dl-spinner"></span>
-												{t(
-													"versionDownloader.downloading",
-												)}
-											</button>
-										{:else}
-											<button
-												type="button"
-												class="download-btn"
-												onclick={() =>
-													handleDownloadLoader(item)}
-											>
-												{t(
-													"versionDownloader.downloadBtn",
-												)}
-											</button>
-										{/if}
+								{@const downloading =
+									isVersionDownloading(item.id) ||
+									enqueueing.has(item.id)}
+								<div class="version-row" class:installed>
+									<div class="row-icon">
+										<Icon
+											name={activeLoader.iconName}
+											size={23}
+										/>
 									</div>
-								{/snippet}
-							</VirtualList>
-						{/if}
-					</div>
+									<div class="version-info">
+										<div class="version-title">
+											<strong title={item.title}
+												>{item.title}</strong
+											>
+											<span
+												class="version-badge"
+												class:stable={item.stable}
+												>{item.badge}</span
+											>
+										</div>
+										<span class="version-subtitle"
+											>{item.subtitle}</span
+										>
+									</div>
+									{#if installed}
+										<span class="installed-status"
+											><Icon
+												name="ui:check-circle"
+												size={16}
+											/><span
+												>{t(
+													"versionDownloader.installedTag",
+												)}</span
+											></span
+										>
+									{:else if downloading}
+										<button
+											type="button"
+											class="download-btn"
+											disabled
+											><span class="loading-ring small"
+											></span>{t(
+												"versionDownloader.downloading",
+											)}</button
+										>
+									{:else}
+										<button
+											type="button"
+											class="download-btn"
+											onclick={() => handleDownload(item)}
+											aria-label={`${t("versionDownloader.downloadBtn")} ${activeLoader.label} ${item.title}`}
+										>
+											<Icon
+												name="ui:download"
+												size={15}
+											/>{t(
+												"versionDownloader.downloadBtn",
+											)}
+										</button>
+									{/if}
+								</div>
+							{/snippet}
+						</VirtualList>
+					{/key}
 				{/if}
+			</div>
+			<div class="catalog-footer">
+				<Icon name="instance:check-square" size={15} /><span
+					>{t("versionDownloader.installHint")}</span
+				>
 			</div>
 		</div>
 	</div>
 </ModalBase>
 
-<Tooltip bind:open={tooltipOpen} x={tooltipX} y={tooltipY} placement="right">
-	{tooltipText}
-</Tooltip>
-
 <style>
-	.version-downloader-body {
+	.version-catalog {
 		display: flex;
 		flex-direction: column;
-		gap: 12px;
-		height: 100%;
-		max-height: 50vh;
+		height: min(640px, 72vh);
 		min-height: 0;
+		gap: 22px;
 	}
-
-	.vd-header {
+	.catalog-panel {
 		display: flex;
-		justify-content: flex-end;
+		flex-direction: column;
+		flex: 1;
+		min-height: 0;
+		gap: 18px;
 	}
-
-	.vd-refresh-btn {
-		background: none;
-		border: none;
-		color: var(--text-muted);
-		cursor: pointer;
-		padding: 4px;
-		display: flex;
-		align-items: center;
+	.catalog-panel:focus-visible {
+		outline: 2px solid var(--accent);
+		outline-offset: 4px;
 		border-radius: var(--border-radius-sm);
-		transition: color 0.2s;
 	}
-
-	.vd-refresh-btn:hover:not(:disabled) {
-		color: var(--text-primary);
-	}
-
-	.vd-refresh-btn:disabled {
-		opacity: 0.5;
-		cursor: not-allowed;
-	}
-
-	.vd-refresh-btn svg {
-		display: block;
-	}
-
-	.vd-refresh-btn svg.spin {
-		animation: vd-spin 1s linear infinite;
-	}
-
-	.vd-layout {
-		display: flex;
-		flex: 1;
-		gap: 16px;
-		min-height: 0;
-	}
-
-	.vd-loader-sidebar {
-		width: 110px;
-		flex-shrink: 0;
-		display: flex;
-		flex-direction: column;
-	}
-
-	@media (max-width: 500px) {
-		.vd-loader-sidebar {
-			width: 64px;
-		}
-	}
-
-	.vd-content {
-		flex: 1;
-		min-height: 0;
-		overflow: hidden;
-		display: flex;
-		flex-direction: column;
-	}
-
-	.vd-tab-content {
-		display: flex;
-		flex-direction: column;
-		gap: 12px;
-		flex: 1;
-		min-height: 0;
-	}
-
-	.vd-controls {
-		display: flex;
-		gap: 12px;
-		flex-wrap: wrap;
-		flex-shrink: 0;
-	}
-
-	.vd-control {
-		flex: 1;
-		min-width: 160px;
-		display: flex;
-		flex-direction: column;
-	}
-
-	.vd-search {
-		width: 100%;
-		flex-shrink: 0;
-	}
-
-	.vd-search .text-input {
-		width: 100%;
-	}
-
-	.vd-hint {
-		font-size: 0.75rem;
-		color: var(--text-muted);
-		padding: 0 4px;
-		flex-shrink: 0;
-	}
-
-	:global(.vd-virtual-list) {
-		flex: 1;
-		min-height: 0;
-	}
-
-	:global(.vd-virtual-list .virtual-list-item-wrapper) {
-		padding: 3px 0;
-		box-sizing: border-box;
-	}
-
-	@keyframes vd-spin {
-		to {
-			transform: rotate(360deg);
-		}
-	}
-
-	.qm-empty-state {
+	.refresh-btn {
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		padding: 40px 20px;
+		width: 32px;
+		height: 32px;
+		border: 1px solid var(--border);
+		border-radius: var(--border-radius-sm);
+		background: transparent;
 		color: var(--text-muted);
-		font-size: 0.85rem;
-		text-align: center;
+		cursor: pointer;
 	}
-
-	.version-card {
+	.refresh-btn:hover:not(:disabled) {
+		color: var(--text-primary);
+		background: var(--surface-hover);
+	}
+	.refresh-btn:disabled {
+		opacity: 0.45;
+		cursor: default;
+	}
+	.refresh-btn > span {
+		display: flex;
+	}
+	.source-heading {
 		display: flex;
 		align-items: center;
-		justify-content: space-between;
-		padding: 10px 12px;
+		gap: 16px;
+		flex-shrink: 0;
+	}
+	.source-icon {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 64px;
+		height: 64px;
+		flex-shrink: 0;
 		background: var(--bg-card);
-		border: 1px solid var(--border-color);
-		border-radius: var(--border-radius);
-		gap: 8px;
-		transition:
-			background-color 0.15s ease,
-			border-color 0.15s ease;
+		border: 1px solid var(--border);
+		border-radius: 16px;
 	}
-
-	.version-card:hover {
-		background: var(--surface-hover);
-		border-color: rgba(var(--surface-rgb), 0.2);
+	h2 {
+		margin: 0 0 5px;
+		color: var(--text-primary);
+		font-size: 1.3rem;
+		font-weight: 700;
 	}
-
-	.version-card-info {
+	.source-heading p {
+		margin: 0;
+		color: var(--text-muted);
+		font-size: 0.8rem;
+		line-height: 1.5;
+	}
+	.catalog-filters {
 		display: flex;
 		flex-direction: column;
-		gap: 2px;
-		min-width: 0;
-		flex: 1;
+		gap: 12px;
+		padding: 16px;
+		background: var(--bg-card);
+		border: 1px solid var(--border);
+		border-radius: var(--border-radius);
+		flex-shrink: 0;
 	}
-
-	.version-card-name {
+	.filter-row {
+		display: flex;
+		gap: 14px;
+		align-items: flex-end;
+	}
+	.mc-filter {
+		width: 190px;
+		flex-shrink: 0;
+	}
+	.filter-label {
+		display: block;
+		color: var(--text-secondary);
+		font-size: 0.72rem;
 		font-weight: 600;
-		font-size: 0.85rem;
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
+		margin-bottom: 7px;
 	}
-
-	.version-card-type {
-		font-size: 0.65rem;
-		color: var(--text-muted);
-		text-transform: uppercase;
-		letter-spacing: 0.3px;
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
+	.search-filter {
+		flex: 1;
+		min-width: 0;
 	}
-
-	.stable-icon {
-		color: var(--accent);
-		display: inline-flex;
+	.search-field {
+		display: flex;
 		align-items: center;
-		vertical-align: middle;
-		margin-right: 4px;
-		flex-shrink: 0;
-		cursor: help;
-	}
-
-	.inst-icon {
-		color: var(--color-success);
-		padding: 4px 8px;
-		font-size: 1rem;
-		font-weight: 700;
-		flex-shrink: 0;
-	}
-
-	.download-btn {
-		background: var(--accent);
-		color: var(--accent-text);
-		border: 1px solid transparent;
-		padding: 6px 12px;
+		gap: 9px;
+		border: 1px solid var(--border);
 		border-radius: var(--border-radius-sm);
-		font-size: 0.75rem;
-		font-weight: 700;
-		cursor: pointer;
-		transition:
-			background-color 0.2s,
-			opacity 0.2s;
-		display: inline-flex;
-		align-items: center;
-		gap: 6px;
-		flex-shrink: 0;
-	}
-
-	.download-btn:hover:not(:disabled) {
-		opacity: 0.9;
-	}
-
-	.download-btn:disabled {
-		opacity: 0.6;
-		cursor: not-allowed;
 		background: var(--bg-input);
 		color: var(--text-muted);
-		border-color: var(--border-color);
+		padding: 0 12px;
+		height: 38px;
 	}
-
-	.dl-spinner {
-		width: 12px;
-		height: 12px;
-		border: 1.5px solid var(--border);
-		border-top-color: var(--text-muted);
-		border-radius: 50%;
-		animation: dl-spin 0.7s linear infinite;
-		will-change: transform;
+	.search-field:focus-within {
+		border-color: var(--accent);
+		outline: 1px solid var(--accent);
+	}
+	.search-field input {
+		min-width: 0;
+		width: 100%;
+		height: 100%;
+		border: 0;
+		outline: none;
+		background: transparent;
+		color: var(--text-primary);
+		font: inherit;
+		font-size: 0.8rem;
+	}
+	.search-field input::placeholder {
+		color: var(--text-muted);
+	}
+	.results-heading {
+		display: flex;
+		align-items: center;
+		gap: 9px;
+		flex-shrink: 0;
+		font-size: 0.66rem;
+		font-weight: 700;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: var(--text-muted);
+	}
+	.result-count {
+		padding: 3px 7px;
+		border-radius: 6px;
+		background: var(--surface-hover);
+		color: var(--text-secondary);
+		letter-spacing: normal;
+	}
+	.installed-count {
+		margin-left: auto;
+		letter-spacing: normal;
+		text-transform: none;
+		font-weight: 400;
+	}
+	.catalog-results {
+		display: flex;
+		flex-direction: column;
+		min-height: 100px;
+		flex: 1;
+		overflow: hidden;
+		border: 1px solid var(--border);
+		border-radius: var(--border-radius);
+		background: var(--bg-card);
+	}
+	:global(.catalog-list) {
+		flex: 1;
+		min-height: 0;
+	}
+	.version-row {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		height: 78px;
+		box-sizing: border-box;
+		padding: 12px 16px;
+		border-bottom: 1px solid var(--border);
+		transition: background-color 0.15s;
+	}
+	.version-row:hover {
+		background: var(--surface-hover);
+	}
+	.row-icon {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 38px;
+		height: 38px;
+		flex-shrink: 0;
+		border-radius: 10px;
+		background: var(--surface-input);
+	}
+	.version-info {
+		flex: 1;
+		min-width: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 5px;
+	}
+	.version-title {
+		display: flex;
+		align-items: center;
+		gap: 9px;
+		min-width: 0;
+	}
+	.version-title strong {
+		font-size: 0.84rem;
+		font-weight: 600;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		color: var(--text-primary);
+	}
+	.version-subtitle {
+		color: var(--text-muted);
+		font-size: 0.7rem;
+	}
+	.version-badge {
+		font-size: 0.6rem;
+		font-weight: 500;
+		color: var(--text-muted);
+		border: 1px solid var(--border);
+		border-radius: 5px;
+		padding: 2px 6px;
+		white-space: nowrap;
+	}
+	.version-badge.stable {
+		color: var(--accent);
+		background: rgba(var(--accent-rgb), 0.07);
+		border-color: rgba(var(--accent-rgb), 0.2);
+	}
+	.download-btn {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 7px;
+		flex-shrink: 0;
+		border: 1px solid var(--border);
+		border-radius: var(--border-radius-sm);
+		background: var(--surface-input);
+		color: var(--text-primary);
+		padding: 8px 11px;
+		font: inherit;
+		font-size: 0.72rem;
+		font-weight: 600;
+		cursor: pointer;
+		transition:
+			background-color 0.15s,
+			border-color 0.15s;
+	}
+	.download-btn:hover:not(:disabled) {
+		background: var(--accent);
+		color: var(--accent-text);
+		border-color: var(--accent);
+	}
+	.download-btn:disabled {
+		color: var(--text-muted);
+		background: transparent;
+		cursor: default;
+	}
+	.installed-status {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		color: var(--color-success);
+		font-size: 0.72rem;
 		flex-shrink: 0;
 	}
-
-	@keyframes dl-spin {
+	.installed .row-icon {
+		opacity: 0.65;
+	}
+	.empty-state {
+		display: flex;
+		flex: 1;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 12px;
+		overflow-y: auto;
+		padding: 22px;
+		text-align: center;
+		color: var(--text-muted);
+		font-size: 0.8rem;
+	}
+	.empty-state strong {
+		color: var(--text-secondary);
+		font-weight: 600;
+	}
+	.empty-state p {
+		margin: 0;
+		line-height: 1.5;
+	}
+	.error-detail {
+		overflow-wrap: anywhere;
+		font-size: 0.7rem;
+	}
+	.secondary-btn {
+		border: 1px solid var(--border);
+		border-radius: var(--border-radius-sm);
+		background: var(--surface-input);
+		color: var(--text-primary);
+		padding: 7px 12px;
+		cursor: pointer;
+		font: inherit;
+		font-size: 0.75rem;
+	}
+	.catalog-footer {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 8px;
+		flex-shrink: 0;
+		color: var(--text-muted);
+		font-size: 0.7rem;
+		line-height: 1.4;
+	}
+	.loading-ring {
+		display: inline-block;
+		width: 24px;
+		height: 24px;
+		border: 2px solid var(--border);
+		border-top-color: var(--accent);
+		border-radius: 50%;
+		animation: spin 0.8s linear infinite;
+		flex-shrink: 0;
+	}
+	.loading-ring.small {
+		width: 12px;
+		height: 12px;
+	}
+	.spin {
+		animation: spin 0.8s linear infinite;
+	}
+	button:focus-visible {
+		outline: 2px solid var(--accent);
+		outline-offset: 2px;
+	}
+	@keyframes spin {
 		to {
 			transform: rotate(360deg);
 		}
 	}
-
-	.linked-selects {
-		width: 100%;
+	@media (prefers-reduced-motion: reduce) {
+		.spin,
+		.loading-ring {
+			animation-duration: 2s;
+		}
 	}
-
-	.linked-selects > :global(.custom-select-container) {
-		width: 100%;
+	@media (max-width: 600px) {
+		.version-catalog {
+			gap: 14px;
+			height: 72vh;
+		}
+		.catalog-panel {
+			gap: 12px;
+		}
+		.source-icon {
+			width: 50px;
+			height: 50px;
+			border-radius: 12px;
+		}
+		.source-heading {
+			gap: 12px;
+		}
+		h2 {
+			font-size: 1.1rem;
+		}
+		.source-heading p {
+			font-size: 0.72rem;
+		}
+		.catalog-filters {
+			padding: 12px;
+		}
+		.mc-filter {
+			width: 130px;
+		}
+		.filter-row {
+			gap: 10px;
+		}
+		.version-row {
+			padding: 10px;
+			gap: 8px;
+		}
+		.row-icon {
+			display: none;
+		}
+		.version-title {
+			flex-wrap: wrap;
+			gap: 4px 8px;
+		}
+		.version-title strong {
+			max-width: 100%;
+		}
+		.download-btn {
+			padding: 8px;
+		}
+		.catalog-footer {
+			font-size: 0.65rem;
+		}
+	}
+	@media (max-width: 380px) {
+		.filter-row {
+			flex-direction: column;
+			align-items: stretch;
+		}
+		.mc-filter {
+			width: 100%;
+		}
 	}
 </style>

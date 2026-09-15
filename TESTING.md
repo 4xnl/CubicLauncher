@@ -116,6 +116,16 @@ bun run tauri build
 - [ ] Crear instancia Fabric, descargarla y lanzarla.
 - [ ] Crear instancia Forge, descargarla y lanzarla.
 - [ ] Crear instancia Quilt, descargarla y lanzarla.
+- [ ] En Descargas > OptiFine, elegir Minecraft y descargar una versión. Comprobar progreso, Java automático y marca de instalado.
+- [ ] Crear o editar una instancia con OptiFine instalado y lanzarla. Comprobar versiones legacy (1.12.2) y modernas (1.20.1).
+- [ ] Activar loaders inestables y comprobar versiones preliminares de OptiFine. Probar actualizar el catálogo y reintentar después de un error de red.
+
+La prueba de integración de OptiFine descarga los clientes y los instaladores oficiales, ejecuta el parcheador y comprueba perfiles y bibliotecas en un directorio temporal:
+
+```bash
+# Requiere Internet y Java en PATH (o indicar OPTIFINE_TEST_JAVA).
+cargo test -p aqua optifine_official_install_smoke -- --ignored --nocapture
+```
 
 ### Mundos de las instancias
 

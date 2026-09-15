@@ -2,6 +2,7 @@ mod downloaders;
 pub(crate) mod errors;
 pub(crate) mod jre;
 pub(crate) mod manifest;
+pub mod optifine;
 pub mod path_security;
 pub mod progress;
 pub(crate) mod types;
@@ -10,7 +11,7 @@ pub(crate) mod utilities;
 pub use downloaders::{
     DownloadBatch, DownloadHandle, DownloadItemSpec, DownloadManager, FabricBatch, ForgeBatch,
     ForgeVersionInfo, GenericBatch, JreBatch, MinecraftBatch, NeoForgeBatch, NeoForgeVersionInfo,
-    QuiltBatch,
+    OptiFineBatch, QuiltBatch,
 };
 pub use errors::AquaError;
 pub use jre::{ArchiveFormat, JrePackage, JreProviderChain, JreStatus, JreVendor};

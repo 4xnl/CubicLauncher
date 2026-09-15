@@ -13,6 +13,7 @@
 		onclose,
 		children,
 		footer,
+		headerActions,
 	} = $props<{
 		open: boolean;
 		title?: string;
@@ -21,6 +22,7 @@
 		onclose?: () => void;
 		children?: Snippet;
 		footer?: Snippet;
+		headerActions?: Snippet;
 	}>();
 
 	function close() {
@@ -59,14 +61,17 @@
 					{#if title}
 						<span class="modal-title">{title}</span>
 					{/if}
-					<button
-						type="button"
-						class="action-btn"
-						onclick={close}
-						aria-label="Close"
-					>
-						<CloseIcon size={20} />
-					</button>
+					<div class="modal-header-actions">
+						{#if headerActions}{@render headerActions()}{/if}
+						<button
+							type="button"
+							class="action-btn"
+							onclick={close}
+							aria-label="Close"
+						>
+							<CloseIcon size={20} />
+						</button>
+					</div>
 				</div>
 
 				<div class="modal-body">
@@ -138,6 +143,13 @@
 		display: flex;
 		justify-content: space-between;
 		align-items: center;
+	}
+
+	.modal-header-actions {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		margin-left: auto;
 	}
 
 	.modal-title {

@@ -68,6 +68,8 @@
 			return `${selectedMcVersion}-forge-${selectedLoaderVersion}`;
 		if (selectedLoader === "neoforge")
 			return `${selectedMcVersion}-neoforge-${selectedLoaderVersion}`;
+		if (selectedLoader === "optifine")
+			return `${selectedMcVersion}-OptiFine_${selectedLoaderVersion}`;
 		return "";
 	});
 
@@ -105,6 +107,13 @@
 			};
 
 		const neoforgeIdx = version.indexOf("-neoforge-");
+		const optifineIdx = version.indexOf("-OptiFine_");
+		if (optifineIdx >= 0)
+			return {
+				loader: "optifine" as const,
+				mcVersion: version.substring(0, optifineIdx),
+				loaderVersion: version.substring(optifineIdx + 10),
+			};
 		if (neoforgeIdx >= 0)
 			return {
 				loader: "neoforge" as const,

@@ -70,9 +70,11 @@ impl GameVersion {
         let loader = Loader::from_version_id(id);
         let mc_version = match &loader {
             Loader::Vanilla => id.to_string(),
-            Loader::Fabric(_) | Loader::Forge(_) | Loader::NeoForge(_) | Loader::Quilt(_) => {
-                extract_mc_version(id)
-            }
+            Loader::Fabric(_)
+            | Loader::Forge(_)
+            | Loader::NeoForge(_)
+            | Loader::Quilt(_)
+            | Loader::OptiFine(_) => extract_mc_version(id),
         };
         Self { mc_version, loader }
     }
@@ -84,6 +86,7 @@ impl GameVersion {
             Loader::Forge(v) => format!("{}-forge-{}", self.mc_version, v),
             Loader::NeoForge(v) => format!("{}-neoforge-{}", self.mc_version, v),
             Loader::Quilt(v) => format!("quilt-loader-{}-{}", v, self.mc_version),
+            Loader::OptiFine(v) => format!("{}-OptiFine_{}", self.mc_version, v),
         }
     }
 
@@ -94,6 +97,7 @@ impl GameVersion {
             Loader::Forge(v) => format!("{} (Forge {})", self.mc_version, v),
             Loader::NeoForge(v) => format!("{} (NeoForge {})", self.mc_version, v),
             Loader::Quilt(v) => format!("{} (Quilt {})", self.mc_version, v),
+            Loader::OptiFine(v) => format!("{} (OptiFine {})", self.mc_version, v),
         }
     }
 }
@@ -135,7 +139,7 @@ fn extract_mc_version(full_id: &str) -> String {
         return rest[dash + 1..].to_string();
     }
     // Forge/NeoForge: "{mc_version}-{loader_name}-{loader_version}"
-    for loader_name in &["-forge-", "-neoforge-"] {
+    for loader_name in &["-forge-", "-neoforge-", "-OptiFine_"] {
         if let Some(idx) = full_id.find(loader_name) {
             return full_id[..idx].to_string();
         }
@@ -153,7 +157,11 @@ pub fn resolve_dependencies(version_id: &str) -> Vec<String> {
     let game_version = GameVersion::from_version_id(version_id);
     match &game_version.loader {
         Loader::Vanilla => vec![version_id.to_string()],
-        Loader::Fabric(_) | Loader::Forge(_) | Loader::NeoForge(_) | Loader::Quilt(_) => {
+        Loader::Fabric(_)
+        | Loader::Forge(_)
+        | Loader::NeoForge(_)
+        | Loader::Quilt(_)
+        | Loader::OptiFine(_) => {
             vec![game_version.mc_version.clone(), version_id.to_string()]
         }
     }

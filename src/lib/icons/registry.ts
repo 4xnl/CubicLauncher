@@ -62,6 +62,7 @@ export const ICON_REGISTRY: Record<string, string> = {
 	"brand:modrinth": "/images/instances/modth.png",
 	"brand:neoforged": "/images/instances/neoforged.png",
 	"brand:quilt": "/images/instances/quilt.png",
+	"brand:optifine": "/images/instances/optifine.png",
 	"brand:vanilla": "/images/instances/vanilla.png",
 
 	"ui:shaders": "/images/icons/ui/shaders.svg",

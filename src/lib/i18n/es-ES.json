@@ -747,6 +747,27 @@
 		"INST_BUSY": "La instancia se está ejecutando"
 	},
 	"versionDownloader": {
+		"descriptions": {
+			"vanilla": "La experiencia original de Minecraft, directamente de Mojang.",
+			"fabric": "Un loader ligero para personalizar Minecraft con mods.",
+			"forge": "Un amplio ecosistema de mods para construir tu experiencia.",
+			"neoforge": "Una plataforma moderna para la nueva generación de mods.",
+			"quilt": "Un loader de mods abierto y desarrollado por la comunidad.",
+			"optifine": "Mejora el rendimiento y personaliza los gráficos con shaders."
+		},
+		"searchLabel": "Buscar versión",
+		"availableVersions": "Versiones disponibles",
+		"installedCount": "instaladas",
+		"installedCountSingular": "instalada",
+		"stable": "Estable",
+		"preview": "Preliminar",
+		"historical": "Histórica",
+		"recommended": "Recomendada",
+		"otherBuild": "Otra versión",
+		"emptyHint": "Prueba otra búsqueda o ajusta los filtros de versiones.",
+		"clearSearch": "Limpiar búsqueda",
+		"retry": "Reintentar",
+		"installHint": "Las versiones instaladas estarán disponibles al crear o editar una instancia.",
 		"title": "Descargar Versiones",
 		"searchPlaceholder": "Buscar versión...",
 		"loading": "Cargando versiones...",
@@ -760,6 +781,8 @@
 		"downloading": "Descargando...",
 		"forgeJavaHint": "Forge requiere Java 21 configurado en Ajustes > Java.",
 		"neoForgeJavaHint": "NeoForge requiere Java 17/21 configurado en Ajustes > Java.",
+		"optiFineHint": "Se instalarán OptiFine, Minecraft y el Java necesario. Las versiones preliminares se muestran al activar los loaders inestables en Ajustes.",
+		"loadError": "No se pudo cargar el catálogo. Pulsa Actualizar para reintentar.",
 		"loaderSearchPlaceholder": "Buscar versión del loader..."
 	},
 	"market": {

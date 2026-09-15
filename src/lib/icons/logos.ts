@@ -6,6 +6,7 @@ export const INSTANCE_LOGOS = [
 	"forge.png",
 	"neoforged.png",
 	"quilt.png",
+	"optifine.png",
 	"modth.png",
 ];
 
@@ -17,6 +18,7 @@ const LOGO_MAP: Record<string, string> = {
 	forge: "forge.png",
 	neoforge: "neoforged.png",
 	quilt: "quilt.png",
+	optifine: "optifine.png",
 };
 
 export function getLoaderLogo(loader: string): string {

@@ -747,6 +747,27 @@
 		"GENERIC": "An unexpected error occurred: {error}"
 	},
 	"versionDownloader": {
+		"descriptions": {
+			"vanilla": "The original Minecraft experience, straight from Mojang.",
+			"fabric": "A lightweight loader to customize Minecraft with mods.",
+			"forge": "A wide ecosystem of mods to build your own experience.",
+			"neoforge": "A modern platform for the next generation of mods.",
+			"quilt": "An open, community-driven mod loader.",
+			"optifine": "Improve performance and customize your graphics with shaders."
+		},
+		"searchLabel": "Find a version",
+		"availableVersions": "Available versions",
+		"installedCount": "installed",
+		"installedCountSingular": "installed",
+		"stable": "Stable",
+		"preview": "Preview",
+		"historical": "Historical",
+		"recommended": "Recommended",
+		"otherBuild": "Other build",
+		"emptyHint": "Try another search or adjust the version filters.",
+		"clearSearch": "Clear search",
+		"retry": "Retry",
+		"installHint": "Installed versions will be available when creating or editing an instance.",
 		"title": "Download Versions",
 		"searchPlaceholder": "Search version...",
 		"loading": "Loading versions...",
@@ -760,6 +781,8 @@
 		"downloading": "Downloading...",
 		"forgeJavaHint": "Forge requires Java 21 to be configured in Settings > Java.",
 		"neoForgeJavaHint": "NeoForge requires Java 17/21 to be configured in Settings > Java.",
+		"optiFineHint": "OptiFine, Minecraft and the required Java runtime will be installed. Enable unstable loaders in Settings to show preview versions.",
+		"loadError": "Could not load the catalog. Press Refresh to try again.",
 		"loaderSearchPlaceholder": "Search loader version..."
 	},
 	"market": {
