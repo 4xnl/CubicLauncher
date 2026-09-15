@@ -101,6 +101,9 @@
 		if (selectedLoader === "neoforge" && selectedLoaderVersion) {
 			return `${selectedMcVersion}-neoforge-${selectedLoaderVersion}`;
 		}
+		if (selectedLoader === "optifine" && selectedLoaderVersion) {
+			return `${selectedMcVersion}-OptiFine_${selectedLoaderVersion}`;
+		}
 		return "";
 	});
 
@@ -164,6 +167,7 @@
 		if (l === "neoforge" || l === "neo")
 			return getIconPath("brand:neoforged");
 		if (l === "quilt") return getIconPath("brand:vanilla");
+		if (l === "optifine") return getIconPath("brand:optifine");
 		return null;
 	}
 
@@ -231,6 +235,8 @@
 			await downloadForge(selectedMcVersion, selectedLoaderVersion);
 		} else if (selectedLoader === "neoforge") {
 			await downloadNeoForge(selectedMcVersion, selectedLoaderVersion);
+		} else if (selectedLoader === "optifine") {
+			await addToQueue(finalVersionId);
 		}
 
 		invalidateInstalledVersions();

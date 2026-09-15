@@ -10,6 +10,7 @@ export interface McVersions {
 	forge: Set<string>;
 	neoforge: Set<string>;
 	quilt: Set<string>;
+	optifine: Set<string>;
 }
 
 export type LoaderVersions = Map<string, Set<string>>;

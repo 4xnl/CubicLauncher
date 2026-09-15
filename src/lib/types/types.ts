@@ -173,7 +173,7 @@ export interface Notification {
 }
 
 export interface McVersion {
-	loader: "vanilla" | "fabric" | "forge" | "neoforge" | "quilt";
+	loader: "vanilla" | "fabric" | "forge" | "neoforge" | "quilt" | "optifine";
 	version: string;
 	type: string;
 }
@@ -200,6 +200,14 @@ export interface ForgeGameVersion {
 	version_id: string;
 	game_version: string;
 	forge_version: string;
+	stable: boolean;
+}
+
+export interface OptiFineVersion {
+	version_id: string;
+	game_version: string;
+	optifine_version: string;
+	filename: string;
 	stable: boolean;
 }
 

@@ -14,6 +14,9 @@ export interface VersionStatus {
 }
 
 export function parseInstalledVersion(raw: string): McVersion {
+	if (raw.includes("-OptiFine_")) {
+		return { loader: "optifine", version: raw, type: "" };
+	}
 	if (raw.includes("fabric")) {
 		const clean = raw
 			.replace(/^fabric-loader-[\d.]+-/, "")
@@ -53,12 +56,14 @@ export function getInstalledMcVersions(raw: string[]): {
 	forge: Set<string>;
 	neoforge: Set<string>;
 	quilt: Set<string>;
+	optifine: Set<string>;
 } {
 	const vanilla = new Set<string>();
 	const fabric = new Set<string>();
 	const forge = new Set<string>();
 	const neoforge = new Set<string>();
 	const quilt = new Set<string>();
+	const optifine = new Set<string>();
 	for (const v of raw) {
 		const parsed = parseInstalledVersion(v);
 		if (parsed.loader === "vanilla") vanilla.add(parsed.version);
@@ -66,8 +71,9 @@ export function getInstalledMcVersions(raw: string[]): {
 		else if (parsed.loader === "forge") forge.add(parsed.version);
 		else if (parsed.loader === "neoforge") neoforge.add(parsed.version);
 		else if (parsed.loader === "quilt") quilt.add(parsed.version);
+		else if (parsed.loader === "optifine") optifine.add(parsed.version);
 	}
-	return { vanilla, fabric, forge, neoforge, quilt };
+	return { vanilla, fabric, forge, neoforge, quilt, optifine };
 }
 
 function addInstalledLoaderVersion(
@@ -95,6 +101,16 @@ export function getInstalledLoaderVersions(
 	const result = new Map<string, Set<string>>();
 
 	for (const v of raw) {
+		if (v.includes("-OptiFine_")) {
+			const [mcVersion, loaderVersion] = v.split("-OptiFine_");
+			addInstalledLoaderVersion(
+				result,
+				"optifine",
+				mcVersion,
+				loaderVersion,
+			);
+			continue;
+		}
 		if (v.includes("fabric-loader-")) {
 			const clean = v.replace(/-fabric$/, "");
 			const prefix = "fabric-loader-";

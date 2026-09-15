@@ -8,6 +8,7 @@ import {
 	type FabricGameVersion,
 	type LoaderVersion,
 	type ForgeGameVersion,
+	type OptiFineVersion,
 	type NeoForgeGameVersion,
 	type ModrinthSearchResult,
 	type ModrinthVersion,
@@ -391,6 +392,24 @@ export async function getForgeVersions(): Promise<ForgeGameVersion[]> {
 			null,
 		)) ?? []
 	);
+}
+
+export async function getOptiFineVersions(
+	refresh = false,
+): Promise<OptiFineVersion[]> {
+	return invoke<OptiFineVersion[]>(
+		refresh ? "refresh_optifine_versions" : "get_optifine_versions",
+	);
+}
+
+export async function downloadOptiFine(
+	gameVersion: string,
+	optifineVersion: string,
+): Promise<void> {
+	return invokeThrowing("download_optifine", {
+		gameVersion,
+		optifineVersion,
+	});
 }
 
 export async function refreshForgeVersions(): Promise<ForgeGameVersion[]> {

@@ -65,6 +65,7 @@
 			label: "Quilt",
 			iconName: "brand:quilt",
 		},
+		{ value: "optifine", label: "OptiFine", iconName: "brand:optifine" },
 	];
 
 	function compareVersions(a: string, b: string): number {
@@ -98,6 +99,10 @@
 				const idx = v.indexOf("-forge-");
 				return idx >= 0 ? v.substring(0, idx) : v;
 			});
+		} else if (loader === "optifine") {
+			baseVersions = Array.from(parsed.optifine).map(
+				(v) => v.split("-OptiFine_")[0],
+			);
 		} else if (loader === "neoforge") {
 			baseVersions = Array.from(parsed.neoforge).map((v) => {
 				const idx = v.indexOf("-neoforge-");
