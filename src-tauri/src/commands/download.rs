@@ -3,9 +3,12 @@ use crate::core::{HTTP, PathManager};
 use crate::services::DownloadQueue;
 use aqua::{FabricBatch, QuiltBatch};
 use serde::{Deserialize, Serialize};
-use tracing::info;
+use std::path::Path;
+use std::time::{SystemTime, UNIX_EPOCH};
+use tracing::{info, warn};
 
 const MOJANG_MANIFEST_URL: &str = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json";
+const MANIFEST_CACHE_TTL_SECS: u64 = 3600;
 const FORGE_MAVEN_METADATA_URL: &str =
     "https://maven.minecraftforge.net/net/minecraftforge/forge/maven-metadata.xml";
 const FORGE_PROMOTIONS_URL: &str =
@@ -77,12 +80,20 @@ pub async fn add_to_queue(version: String) {
     DownloadQueue::get().enqueue(version).await
 }
 
-pub async fn download_manifest() -> Result<Vec<MinecraftVersion>, String> {
+fn manifest_timestamp() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs()
+}
+
+async fn download_manifest(cache_path: &Path, url: &str) -> Result<Vec<MinecraftVersion>, String> {
     info!("Descargando manifiesto de versiones desde Mojang");
     let response = HTTP
-        .get(MOJANG_MANIFEST_URL)
+        .get(url)
         .send()
         .await
+        .and_then(reqwest::Response::error_for_status)
         .map_err(|e| DownloadError::Request(e.to_string()).to_string())?;
 
     let bytes = response
@@ -103,18 +114,19 @@ pub async fn download_manifest() -> Result<Vec<MinecraftVersion>, String> {
         manifest.versions.len()
     );
 
-    let cache_path = manifest_cache_path();
-    let mut repo = ablage::Repo::open(&cache_path);
+    let mut repo = ablage::Repo::open(cache_path);
     if let Ok(data) = postcard::to_stdvec(&manifest) {
         repo.put(
             "manifest",
             ablage::Entry {
                 version: 1,
-                fingerprint: 0,
+                fingerprint: manifest_timestamp(),
                 data,
             },
         );
-        let _ = repo.flush();
+        if let Err(error) = repo.flush() {
+            warn!("No se pudo guardar el manifiesto en cache: {error}");
+        }
     }
 
     Ok(manifest.versions)
@@ -122,18 +134,45 @@ pub async fn download_manifest() -> Result<Vec<MinecraftVersion>, String> {
 
 #[tauri::command]
 pub async fn get_available_versions() -> Result<Vec<MinecraftVersion>, String> {
-    let cache_path = manifest_cache_path();
-    let repo = ablage::Repo::open(&cache_path);
+    load_manifest_versions(&manifest_cache_path(), MOJANG_MANIFEST_URL, false).await
+}
+
+async fn load_manifest_versions(
+    cache_path: &Path,
+    url: &str,
+    force_refresh: bool,
+) -> Result<Vec<MinecraftVersion>, String> {
+    let repo = ablage::Repo::open(cache_path);
+    let mut cached = None;
+    let now = manifest_timestamp();
 
     if let Some(entry) = repo.get("manifest")
         && let Ok(manifest) = postcard::from_bytes::<MinecraftManifest>(&entry.data)
     {
-        info!("{} versiones cargadas desde cache", manifest.versions.len());
-        return Ok(manifest.versions);
+        let timestamp = entry.fingerprint;
+        if !force_refresh
+            && timestamp > 0
+            && timestamp <= now
+            && now - timestamp < MANIFEST_CACHE_TTL_SECS
+        {
+            info!("{} versiones cargadas desde cache", manifest.versions.len());
+            return Ok(manifest.versions);
+        }
+        cached = Some(manifest);
     }
 
-    info!("No hay cache de manifiesto, descargando");
-    download_manifest().await
+    info!("Actualizando manifiesto de versiones desde Mojang");
+    match download_manifest(cache_path, url).await {
+        Ok(versions) => Ok(versions),
+        Err(error) => {
+            if let Some(manifest) = cached {
+                warn!("No se pudo actualizar el manifiesto; usando cache: {error}");
+                Ok(manifest.versions)
+            } else {
+                Err(error)
+            }
+        }
+    }
 }
 
 #[tauri::command]
@@ -239,16 +278,7 @@ pub async fn download_fabric(
 #[tauri::command]
 pub async fn refresh_versions() -> Result<Vec<MinecraftVersion>, String> {
     info!("Forzando actualizacion del manifiesto de versiones");
-    let path = manifest_cache_path();
-
-    if path.exists() {
-        tokio::fs::remove_file(&path)
-            .await
-            .map_err(|e| format!("Error al eliminar cache: {}", e))?;
-        info!("Cache de manifiesto eliminado: {:?}", path);
-    }
-
-    download_manifest().await
+    load_manifest_versions(&manifest_cache_path(), MOJANG_MANIFEST_URL, true).await
 }
 
 #[tauri::command]
@@ -908,3 +938,7 @@ pub async fn get_quilt_loader_versions(game_version: String) -> Result<Vec<Loade
     );
     fetch_quilt_loader_versions(&game_version).await
 }
+
+#[cfg(test)]
+#[path = "../tests/commands/download.rs"]
+mod tests;
