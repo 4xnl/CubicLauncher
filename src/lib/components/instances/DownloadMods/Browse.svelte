@@ -249,6 +249,7 @@
 					<VirtualList
 						items={allHits}
 						itemHeight={130}
+						itemHeightVar="--resource-row-height"
 						onNearEnd={handleNearEnd}
 						keyFn={getProjectId}
 					>
@@ -543,7 +544,7 @@
 	.dm-source-tabs {
 		display: flex;
 		gap: 2px;
-		background: rgba(255, 255, 255, 0.04);
+		background: var(--surface-raised);
 		border-radius: var(--border-radius-sm);
 		padding: 2px;
 		flex-shrink: 0;
@@ -564,7 +565,7 @@
 
 	.dm-source-tab:hover {
 		color: var(--text-primary);
-		background: rgba(255, 255, 255, 0.04);
+		background: var(--surface-raised);
 	}
 
 	.dm-source-tab.active {
@@ -663,33 +664,33 @@
 	.dm-mod-card-v {
 		display: flex;
 		align-items: stretch;
-		gap: 14px;
-		padding: 14px 16px;
-		background: rgba(255, 255, 255, 0.02);
-		border: 1px solid var(--border);
+		gap: var(--resource-card-gap, 14px);
+		padding: var(--resource-card-padding);
+		background: var(--surface-subtle);
+		border: var(--border-width) solid var(--border);
 		border-radius: var(--border-radius-sm);
 		cursor: pointer;
 		transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
-		height: calc(100% - 6px);
-		margin: 3px 0;
+		height: calc(100% - var(--resource-row-gap));
+		margin: calc(var(--resource-row-gap) / 2) 0;
 		box-sizing: border-box;
 	}
 
 	.dm-mod-card-v:hover {
-		background: rgba(255, 255, 255, 0.04);
-		border-color: rgba(255, 255, 255, 0.1);
-		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+		background: var(--surface-raised);
+		border-color: var(--border-hover);
+		box-shadow: var(--shadow-md);
 	}
 	.dm-mod-card-v.selected {
 		border-color: var(--accent);
-		background: rgba(255, 255, 255, 0.04);
+		background: var(--surface-raised);
 	}
 
 	.dm-mod-icon-v {
-		width: 56px;
-		height: 56px;
+		width: var(--resource-icon-size);
+		height: var(--resource-icon-size);
 		border-radius: var(--border-radius-sm);
-		background: rgba(255, 255, 255, 0.03);
+		background: var(--surface-card);
 		border: 1px solid var(--border);
 		overflow: hidden;
 		flex-shrink: 0;
@@ -722,8 +723,8 @@
 		min-width: 0;
 	}
 	.dm-mod-title-v {
-		font-size: 0.85rem;
-		font-weight: 700;
+		font-size: var(--resource-title-size, var(--font-size-control));
+		font-weight: var(--font-weight-bold);
 		color: var(--text-primary);
 		white-space: nowrap;
 		overflow: hidden;
@@ -764,7 +765,7 @@
 	.dm-mod-stat {
 		font-size: 0.72rem;
 		color: var(--text-secondary);
-		background: rgba(255, 255, 255, 0.04);
+		background: var(--surface-raised);
 		border: 1px solid var(--border);
 		padding: 2px 7px;
 		border-radius: var(--border-radius-sm);
@@ -784,9 +785,9 @@
 	}
 
 	.dm-select-btn:hover {
-		background: rgba(255, 255, 255, 0.06);
+		background: var(--surface-hover);
 		color: var(--text-primary);
-		border-color: rgba(255, 255, 255, 0.2);
+		border-color: var(--border-hover);
 	}
 	.dm-select-btn.selected {
 		background: var(--accent);
@@ -850,7 +851,7 @@
 		position: absolute;
 		top: 14px;
 		right: 14px;
-		background: rgba(255, 255, 255, 0.05);
+		background: var(--surface-hover);
 		border: 1px solid var(--border);
 		color: var(--text-secondary);
 		width: 26px;
@@ -865,7 +866,7 @@
 	}
 
 	.dm-close-btn:hover {
-		background: rgba(255, 255, 255, 0.1);
+		background: var(--surface-active);
 		color: var(--text-primary);
 	}
 
@@ -883,7 +884,7 @@
 		height: 80px;
 		margin: 8px auto 0 auto;
 		border-radius: var(--border-radius-sm);
-		background: rgba(255, 255, 255, 0.03);
+		background: var(--surface-card);
 		border: 1px solid var(--border);
 		overflow: hidden;
 		display: flex;
@@ -917,7 +918,7 @@
 	}
 	.dm-details-stat {
 		flex: 1;
-		background: rgba(255, 255, 255, 0.03);
+		background: var(--surface-card);
 		border: 1px solid var(--border);
 		border-radius: var(--border-radius-sm);
 		padding: 8px 10px;
@@ -943,7 +944,7 @@
 	}
 	.dm-tag {
 		font-size: 0.68rem;
-		background: rgba(255, 255, 255, 0.04);
+		background: var(--surface-raised);
 		border: 1px solid var(--border);
 		padding: 2px 8px;
 		border-radius: 20px;
@@ -1007,7 +1008,7 @@
 		cursor: not-allowed;
 	}
 	.dm-primary-btn.dm-btn-remove {
-		background: rgba(255, 255, 255, 0.06);
+		background: var(--surface-hover);
 		color: var(--text-primary);
 		border: 1px solid var(--border);
 	}
@@ -1078,7 +1079,7 @@
 		justify-content: center;
 		font-size: 1.2rem;
 		color: var(--text-secondary);
-		background: rgba(255, 255, 255, 0.05);
+		background: var(--surface-hover);
 	}
 
 	@media (max-width: 1200px) {
@@ -1095,7 +1096,7 @@
 			bottom: 0;
 			z-index: 100;
 			width: 320px;
-			box-shadow: -10px 0 30px rgba(0, 0, 0, 0.5);
+			box-shadow: var(--shadow-drawer-left);
 			animation: dm-slide-in 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
 		}
 	}

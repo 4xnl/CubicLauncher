@@ -121,8 +121,11 @@
 		width: 100%;
 		text-align: left;
 		outline: none;
-		height: 44px;
-		min-height: 44px;
+		height: calc(
+			var(--virtual-row-height, var(--sidebar-row-height, 52px)) -
+				var(--sidebar-row-gap, 8px)
+		);
+		min-height: 0;
 		margin-bottom: 8px;
 		box-sizing: border-box;
 		overflow: hidden;
@@ -230,7 +233,7 @@
 
 	.instance-name {
 		font-weight: 600;
-		font-size: 0.85rem;
+		font-size: var(--sidebar-item-font-size, var(--font-size-control));
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;

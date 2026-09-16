@@ -98,15 +98,15 @@
 	}
 
 	:global(.markdown-body code) {
-		background: rgba(255, 255, 255, 0.06);
+		background: var(--surface-hover);
 		padding: 0.15em 0.35em;
 		border-radius: 4px;
-		font-family: monospace;
+		font-family: var(--font-family-mono);
 		font-size: 0.9em;
 	}
 
 	:global(.markdown-body pre) {
-		background: rgba(255, 255, 255, 0.04);
+		background: var(--surface-raised);
 		padding: 10px;
 		border-radius: var(--border-radius-sm);
 		overflow-x: auto;
@@ -140,7 +140,7 @@
 	}
 
 	:global(.markdown-body th) {
-		background: rgba(255, 255, 255, 0.04);
+		background: var(--surface-raised);
 	}
 
 	:global(.markdown-body blockquote) {

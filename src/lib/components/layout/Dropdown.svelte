@@ -118,13 +118,13 @@
 		position: relative;
 		display: flex;
 		flex-direction: column;
-		gap: 6px;
+		gap: var(--input-group-gap, 6px);
 		width: 100%;
 	}
 
 	.dd-label {
-		font-size: 0.68rem;
-		font-weight: 700;
+		font-size: var(--font-size-label);
+		font-weight: var(--font-weight-bold);
 		text-transform: uppercase;
 		letter-spacing: 1px;
 		color: var(--text-secondary);
@@ -135,14 +135,14 @@
 		align-items: center;
 		justify-content: space-between;
 		background: var(--surface-selected);
-		border: 1px solid var(--border);
+		border: var(--border-width) solid var(--border);
 		border-radius: var(--border-radius-sm);
-		padding: 10px 14px;
+		padding: var(--select-padding, var(--control-padding));
 		color: var(--text-primary);
 		font-family: inherit;
-		font-size: 0.85rem;
+		font-size: var(--font-size-control);
 		cursor: pointer;
-		transition: all 0.2s ease;
+		transition: all var(--transition-normal) ease;
 		text-align: left;
 		width: 100%;
 		outline: none;
@@ -150,17 +150,20 @@
 
 	.dd-trigger:hover:not(.dd-disabled) {
 		background: var(--surface-active);
-		border-color: rgba(var(--surface-rgb), 0.2);
+		border-color: var(--border-hover);
 	}
 
 	.dd-trigger.dd-open {
-		border-color: rgba(var(--surface-rgb), 0.3);
+		border-color: var(--border-focus);
 		background: var(--surface-active);
-		box-shadow: 0 0 0 2px rgba(var(--surface-rgb), 0.02);
+		box-shadow: var(
+			--control-focus-shadow,
+			0 0 0 2px var(--surface-subtle)
+		);
 	}
 
 	.dd-trigger.dd-disabled {
-		opacity: 0.5;
+		opacity: var(--disabled-opacity, 0.5);
 		cursor: not-allowed;
 	}
 
@@ -172,17 +175,17 @@
 
 	.dd-dropdown {
 		position: absolute;
-		top: calc(100% + 8px);
+		top: calc(100% + var(--space-sm));
 		left: 0;
 		right: 0;
 		background: var(--surface-dropdown);
-		border: 1px solid var(--border);
+		border: var(--border-width) solid var(--border);
 		border-radius: var(--border-radius-sm);
-		box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+		box-shadow: var(--shadow-floating);
 		z-index: 1000;
-		max-height: 240px;
+		max-height: var(--select-max-height, 240px);
 		overflow-y: auto;
-		padding: 6px;
+		padding: var(--select-menu-padding, 6px);
 		backdrop-filter: blur(var(--backdrop-blur-dropdown, 4px));
 	}
 
@@ -190,12 +193,12 @@
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-		padding: 10px 12px;
+		padding: var(--control-padding);
 		border-radius: var(--border-radius-sm);
 		color: var(--text-secondary);
-		font-size: 0.85rem;
+		font-size: var(--font-size-control);
 		cursor: pointer;
-		transition: all 0.15s ease;
+		transition: all var(--transition-fast) ease;
 		margin-bottom: 2px;
 	}
 
@@ -204,15 +207,15 @@
 	}
 
 	.dd-option:hover {
-		background: rgba(var(--surface-rgb), 0.05);
+		background: var(--surface-hover);
 		color: var(--text-primary);
 	}
 
 	.dd-option.dd-selected {
 		background: var(--surface-selected);
 		color: var(--text-primary);
-		font-weight: 600;
-		border: 1px solid rgba(var(--surface-rgb), 0.05);
+		font-weight: var(--font-weight-medium);
+		border: var(--border-width) solid var(--border);
 	}
 
 	.dd-option-content {
@@ -223,14 +226,14 @@
 	}
 
 	.dd-option-label {
-		font-size: 0.85rem;
+		font-size: var(--font-size-control);
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
 	}
 
 	.dd-option-subtitle {
-		font-size: 0.65rem;
+		font-size: var(--font-size-label);
 		color: var(--text-secondary);
 		white-space: nowrap;
 		overflow: hidden;
@@ -238,7 +241,7 @@
 	}
 
 	:global(.dd-dropdown::-webkit-scrollbar) {
-		width: 4px;
+		width: var(--scrollbar-size);
 	}
 
 	:global(.dd-dropdown::-webkit-scrollbar-track) {
@@ -246,7 +249,7 @@
 	}
 
 	:global(.dd-dropdown::-webkit-scrollbar-thumb) {
-		background: var(--border);
-		border-radius: 10px;
+		background: var(--scrollbar-thumb);
+		border-radius: var(--scrollbar-radius);
 	}
 </style>

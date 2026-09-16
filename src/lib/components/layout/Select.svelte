@@ -331,18 +331,18 @@
 		outline-offset: -1px;
 	}
 	.compact .input-label {
-		font-size: 0.65rem;
-		font-weight: 700;
+		font-size: var(--font-size-label);
+		font-weight: var(--font-weight-bold);
 		letter-spacing: 0.06em;
 		color: var(--text-secondary);
 		text-transform: uppercase;
 		margin: 0;
 	}
 	.compact .select-trigger {
-		min-height: 38px;
-		padding: 8px 12px;
-		font-size: 0.8rem;
-		font-weight: 600;
+		min-height: var(--control-min-height, 38px);
+		padding: var(--control-compact-padding, 8px 12px);
+		font-size: var(--font-size-sm);
+		font-weight: var(--font-weight-medium);
 		border-radius: var(--border-radius);
 		background: var(--bg-card-gradient), var(--surface-input);
 		box-shadow: var(--shadow-sm);
@@ -356,18 +356,18 @@
 		box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 15%, transparent);
 	}
 	.select-dropdown.compact {
-		padding: 6px;
+		padding: var(--select-menu-padding, 6px);
 		border-radius: var(--border-radius);
 		border-color: color-mix(in srgb, var(--accent) 25%, var(--border));
 		box-shadow: var(--shadow-lg, 0 12px 32px rgba(0, 0, 0, 0.3));
 	}
 	.compact .select-option {
-		min-height: 36px;
+		min-height: var(--select-option-min-height, 36px);
 		box-sizing: border-box;
-		padding: 8px 10px;
-		gap: 8px;
-		font-size: 0.8rem;
-		border: 1px solid transparent;
+		padding: var(--control-compact-padding, 8px 10px);
+		gap: var(--space-sm);
+		font-size: var(--font-size-sm);
+		border: var(--border-width) solid transparent;
 	}
 	.compact .select-option.selected {
 		background: color-mix(

@@ -51,7 +51,7 @@
 	const raster = $derived(isRasterIcon(resolvedSrc));
 
 	const style = $derived.by(() => {
-		let base = `width: ${w}; height: ${h};`;
+		let base = `width: calc(${w} * var(--icon-scale, 1)); height: calc(${h} * var(--icon-scale, 1));`;
 		if (color) base += ` color: ${color};`;
 		if (raster) {
 			base += ` background-image: url("${resolvedSrc}");`;

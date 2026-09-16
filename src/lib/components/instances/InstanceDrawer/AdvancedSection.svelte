@@ -185,7 +185,7 @@
 		background: var(--bg-input);
 		border: 1px solid var(--border-color);
 		border-radius: var(--border-radius-sm);
-		box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.25);
+		box-shadow: var(--shadow-inset);
 	}
 
 	.qm-stepper-btn {

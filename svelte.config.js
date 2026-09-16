@@ -7,7 +7,15 @@ import { vitePreprocess } from "@sveltejs/vite-plugin-svelte";
 
 /** @type {import('@sveltejs/kit').Config} */
 const config = {
-	preprocess: vitePreprocess(),
+	preprocess: [
+		vitePreprocess(),
+		{
+			name: "cubic-theme-layer",
+			// Unlayered Inject.css rules can override scoped component styles
+			// without knowing Svelte's generated classes or using !important.
+			style: ({ content }) => ({ code: `@layer cubic {\n${content}\n}` }),
+		},
+	],
 	kit: {
 		adapter: adapter({
 			fallback: "index.html",

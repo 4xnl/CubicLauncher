@@ -75,7 +75,7 @@
 	.mod-card:hover {
 		background: var(--surface-active);
 		border-color: rgba(var(--surface-rgb), 0.1);
-		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+		box-shadow: var(--shadow-md);
 	}
 
 	.mod-card.selected {
@@ -192,10 +192,10 @@
 
 	.mod-status-toggle input[type="checkbox"] {
 		appearance: none;
-		width: 32px;
-		height: 18px;
+		width: var(--toggle-width, 32px);
+		height: var(--toggle-height, 18px);
 		background: rgba(var(--surface-rgb), 0.1);
-		border-radius: 20px;
+		border-radius: var(--border-radius-pill);
 		position: relative;
 		cursor: pointer;
 		outline: none;
@@ -207,18 +207,20 @@
 		position: absolute;
 		top: 2px;
 		left: 2px;
-		width: 14px;
-		height: 14px;
-		background: #fff;
+		width: calc(var(--toggle-height, 18px) - 4px);
+		height: calc(var(--toggle-height, 18px) - 4px);
+		background: var(--toggle-thumb, var(--color-on-success));
 		border-radius: 50%;
 		transition: transform 0.3s;
 	}
 
 	.mod-status-toggle input[type="checkbox"]:checked {
-		background: #4caf50;
+		background: var(--toggle-active, var(--color-success));
 	}
 
 	.mod-status-toggle input[type="checkbox"]:checked::after {
-		transform: translateX(14px);
+		transform: translateX(
+			calc(var(--toggle-width, 32px) - var(--toggle-height, 18px))
+		);
 	}
 </style>

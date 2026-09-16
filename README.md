@@ -149,6 +149,8 @@ dist/                 Archivos de empaquetado para distribuciones
 
 ## Contribuir
 
+Para crear o adaptar temas, consulta las [variables CSS predeterminadas](src/styles/shared/reset.css).
+
 Se aceptan contribuciones de código, documentación, traducciones y reportes de errores. La [guía de contribución](CONTRIBUTING.md) detalla las convenciones del proyecto, las comprobaciones previas a una pull request y el proceso de colaboración.
 
 - **Errores y propuestas:** abrir un [issue](https://github.com/CubicLauncherDevs/CubicLauncher/issues) con una descripción del problema o del cambio sugerido. Para errores, incluir la versión del launcher, el sistema operativo y los pasos para reproducirlos.

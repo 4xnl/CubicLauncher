@@ -2,6 +2,7 @@
 	import { onMount, onDestroy, untrack, type Snippet } from "svelte";
 	import type { MarketProject } from "$lib/types/market";
 	import MarketSkeleton from "./MarketSkeleton.svelte";
+	import { observeThemeMetrics } from "$lib/utils/themeMetrics";
 
 	let {
 		count,
@@ -20,18 +21,31 @@
 		onLoadMore: () => void;
 		children: Snippet<[MarketProject]>;
 	} = $props();
-	const rowHeight = 224;
+	let metrics = $state({ row: 224, gap: 12, card: 280, padding: 8 });
+	const rowHeight = $derived(Math.max(metrics.row, metrics.gap + 1));
 	let container: HTMLDivElement;
 	let width = $state(0);
 	let height = $state(0);
 	let scrollTop = $state(0);
 	let frame: number | undefined;
 	const columns = $derived(
-		Math.max(1, Math.min(4, Math.floor((width - 8 + 12) / 292))),
+		Math.max(
+			1,
+			Math.min(
+				4,
+				Math.floor(
+					(width - metrics.padding + metrics.gap) /
+						(metrics.card + metrics.gap),
+				),
+			),
+		),
 	);
 	const rowCount = $derived(Math.ceil(count / columns));
 	const firstRow = $derived(
-		Math.max(0, Math.floor(scrollTop / rowHeight) - 2),
+		Math.max(
+			0,
+			Math.min(rowCount - 1, Math.floor(scrollTop / rowHeight)) - 2,
+		),
 	);
 	const lastRow = $derived(
 		Math.min(rowCount, Math.ceil((scrollTop + height) / rowHeight) + 2),
@@ -60,13 +74,36 @@
 		});
 	}
 	onMount(() => {
+		const stopMetrics = observeThemeMetrics(
+			container,
+			{
+				row: { variable: "--market-row-height", fallback: 224 },
+				gap: {
+					variable: "--market-grid-gap",
+					fallback: 12,
+					allowZero: true,
+				},
+				card: { variable: "--market-card-min-width", fallback: 280 },
+				padding: {
+					variable: "--market-grid-padding",
+					fallback: 8,
+					allowZero: true,
+				},
+			},
+			(values) => {
+				metrics = values;
+			},
+		);
 		const observer = new ResizeObserver(([entry]) => {
 			width = entry.contentRect.width;
 			height = entry.contentRect.height;
 			scrollTop = container.scrollTop;
 		});
 		observer.observe(container);
-		return () => observer.disconnect();
+		return () => {
+			observer.disconnect();
+			stopMetrics();
+		};
 	});
 	onDestroy(() => {
 		if (frame !== undefined) cancelAnimationFrame(frame);
@@ -78,6 +115,8 @@
 	bind:this={container}
 	onscroll={handleScroll}
 	style:--row-height={`${rowHeight}px`}
+	style:--grid-gap={`${metrics.gap}px`}
+	style:--grid-padding={`${metrics.padding}px`}
 >
 	<div class="grid-space" style:height={`${rowCount * rowHeight}px`}>
 		{#each rows as row (row)}
@@ -125,9 +164,9 @@
 		box-sizing: border-box;
 		display: grid;
 		grid-template-columns: repeat(var(--columns), minmax(0, 1fr));
-		gap: 12px;
-		height: calc(var(--row-height) - 12px);
-		padding-right: 8px;
+		gap: var(--grid-gap);
+		height: calc(var(--row-height) - var(--grid-gap));
+		padding-right: var(--grid-padding);
 	}
 	.placeholder {
 		min-width: 0;

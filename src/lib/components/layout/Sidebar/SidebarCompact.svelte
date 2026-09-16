@@ -231,6 +231,7 @@
 				<VirtualList
 					items={launcherStore.loadedInstances}
 					itemHeight={50}
+					itemHeightVar="--sidebar-compact-row-height"
 					keyFn={(i) => i.uuid}
 					hideScrollbar={true}
 				>
@@ -383,7 +384,7 @@
 
 <style>
 	.sidebar-compact {
-		width: 70px;
+		width: var(--sidebar-compact-width, 70px);
 		flex-shrink: 0;
 		background: var(--bg-sidebar-gradient, var(--bg-sidebar));
 		border-right: 1px solid var(--border);
@@ -421,7 +422,7 @@
 		border: 1px solid var(--border);
 		color: var(--text-secondary);
 		border-radius: var(--border-radius-sm);
-		box-shadow: 0 0 6px rgba(0, 0, 0, 0.3);
+		box-shadow: var(--shadow-indicator);
 		cursor: pointer;
 		display: flex;
 		align-items: center;
@@ -480,11 +481,19 @@
 
 	.sc-instance-item {
 		position: relative;
-		width: 42px;
-		height: 42px;
+		width: min(
+			var(--sidebar-compact-item-size, 42px),
+			calc(100% - var(--space-sm))
+		);
+		height: calc(
+			var(--virtual-row-height, 50px) - var(--sidebar-row-gap, 8px)
+		);
 		background: transparent;
 		border: 1px solid transparent;
-		border-radius: 10px;
+		border-radius: var(
+			--sidebar-compact-item-radius,
+			var(--border-radius-lg)
+		);
 		cursor: pointer;
 		display: flex;
 		align-items: center;
@@ -533,7 +542,7 @@
 		color: var(--color-warning);
 		pointer-events: none;
 		z-index: 1;
-		box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+		box-shadow: var(--shadow-sm);
 	}
 
 	.sc-tools {
@@ -584,7 +593,7 @@
 		height: 17px;
 		padding: 0 4px;
 		background: var(--color-error, #ef4444);
-		color: white;
+		color: var(--color-on-error);
 		border-radius: 9px;
 		font-size: 0.6rem;
 		font-weight: 800;

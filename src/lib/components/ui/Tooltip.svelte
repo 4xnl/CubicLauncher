@@ -86,7 +86,7 @@
 		background: var(--bg-surface, #1e1e1e);
 		border: 1px solid var(--border);
 		border-radius: var(--border-radius-sm, 6px);
-		box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+		box-shadow: var(--shadow-floating);
 		backdrop-filter: blur(var(--backdrop-blur-dropdown, 4px));
 		pointer-events: none;
 	}

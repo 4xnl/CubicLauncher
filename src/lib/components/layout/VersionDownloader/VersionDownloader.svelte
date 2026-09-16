@@ -526,6 +526,7 @@
 						<VirtualList
 							items={filteredItems}
 							itemHeight={78}
+							itemHeightVar="--version-row-height"
 							keyFn={(item) => item.id}
 							class="catalog-list"
 							padding={0}
@@ -784,7 +785,7 @@
 		display: flex;
 		align-items: center;
 		gap: 12px;
-		height: 78px;
+		height: var(--virtual-row-height, var(--version-row-height, 78px));
 		box-sizing: border-box;
 		padding: 12px 16px;
 		border-bottom: 1px solid var(--border);

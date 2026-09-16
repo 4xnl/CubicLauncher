@@ -1,10 +1,12 @@
 <script lang="ts" generics="T">
 	import { onMount, onDestroy } from "svelte";
 	import type { Snippet } from "svelte";
+	import { observeThemeMetrics } from "$lib/utils/themeMetrics";
 
 	interface Props {
 		items: T[];
 		itemHeight: number;
+		itemHeightVar?: string;
 		children: Snippet<[T, number]>;
 		class?: string;
 		padding?: number;
@@ -17,6 +19,7 @@
 	let {
 		items,
 		itemHeight,
+		itemHeightVar,
 		children,
 		class: className = "",
 		padding = 20,
@@ -33,15 +36,37 @@
 	let disposed = false;
 	let frame: number | undefined;
 
-	const totalHeight = $derived(items.length * itemHeight + padding);
+	let measuredHeight = $state(0);
+	const rowHeight = $derived(measuredHeight || itemHeight);
+	$effect(() => {
+		if (!container || !itemHeightVar) {
+			measuredHeight = 0;
+			return;
+		}
+		return observeThemeMetrics(
+			container,
+			{
+				row: { variable: itemHeightVar, fallback: itemHeight },
+			},
+			({ row }) => {
+				measuredHeight = row;
+			},
+		);
+	});
+
+	const totalHeight = $derived(items.length * rowHeight + padding);
 
 	const startIndex = $derived(
-		Math.max(0, Math.floor(scrollTop / itemHeight) - overscan),
+		Math.max(
+			0,
+			Math.min(items.length - 1, Math.floor(scrollTop / rowHeight)) -
+				overscan,
+		),
 	);
 	const endIndex = $derived(
 		Math.min(
 			items.length - 1,
-			Math.floor((scrollTop + containerHeight) / itemHeight) + overscan,
+			Math.floor((scrollTop + containerHeight) / rowHeight) + overscan,
 		),
 	);
 
@@ -99,7 +124,7 @@
 			<div
 				class="virtual-list-item-wrapper"
 				style="position: absolute; transform: translateY({index *
-					itemHeight}px); left: 0; width: 100%; height: {itemHeight}px;"
+					rowHeight}px); left: 0; width: 100%; height: {rowHeight}px; --virtual-row-height: {rowHeight}px;"
 			>
 				{@render children(item, index)}
 			</div>

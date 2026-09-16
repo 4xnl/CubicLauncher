@@ -364,7 +364,7 @@
 
 	.dm-queue-box {
 		flex: 1;
-		background: rgba(255, 255, 255, 0.02);
+		background: var(--surface-subtle);
 		border: 1px solid var(--border);
 		border-radius: var(--border-radius-sm);
 		padding: 16px;
@@ -423,13 +423,13 @@
 		align-items: center;
 		gap: 10px;
 		padding: 8px 10px;
-		background: rgba(255, 255, 255, 0.02);
+		background: var(--surface-subtle);
 		border: 1px solid var(--border);
 		border-radius: var(--border-radius-sm);
 		min-height: 42px;
 	}
 	.dm-dep-row:hover {
-		background: rgba(255, 255, 255, 0.04);
+		background: var(--surface-raised);
 	}
 
 	.dm-dep-icon {
@@ -525,7 +525,7 @@
 		align-items: center;
 		margin-top: 16px;
 		padding: 14px 16px;
-		background: rgba(255, 255, 255, 0.02);
+		background: var(--surface-subtle);
 		border: 1px solid var(--border);
 		border-radius: var(--border-radius-sm);
 	}

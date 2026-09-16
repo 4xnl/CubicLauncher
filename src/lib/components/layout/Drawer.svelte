@@ -170,7 +170,7 @@
 	.drawer-overlay {
 		position: fixed;
 		inset: 0;
-		background: rgba(0, 0, 0, 0.55);
+		background: var(--drawer-overlay, var(--bg-overlay));
 		z-index: 100;
 		backdrop-filter: blur(var(--backdrop-blur-overlay, 2px));
 		-webkit-backdrop-filter: blur(var(--backdrop-blur-overlay, 2px));
@@ -181,7 +181,7 @@
 		position: fixed;
 		z-index: 101;
 		background: var(--bg-sidebar);
-		border-left: 1px dotted var(--border);
+		border-left: var(--border-width) dotted var(--border);
 		display: flex;
 		flex-direction: column;
 		overflow: hidden;
@@ -194,20 +194,20 @@
 		top: 0;
 		right: 0;
 		height: 100%;
-		width: min(340px, 90vw);
+		width: min(var(--drawer-width, 340px), 90vw);
 		border-radius: var(--border-radius-sm) 0 0 var(--border-radius-sm);
 		border-right: none;
-		box-shadow: -8px 0 32px rgba(0, 0, 0, 0.6);
+		box-shadow: var(--shadow-drawer-left);
 	}
 
 	.drawer--left {
 		top: 0;
 		left: 0;
 		height: 100%;
-		width: min(340px, 90vw);
+		width: min(var(--drawer-width, 340px), 90vw);
 		border-radius: 0 var(--border-radius-sm) var(--border-radius-sm) 0;
 		border-left: none;
-		box-shadow: 8px 0 32px rgba(0, 0, 0, 0.6);
+		box-shadow: var(--shadow-drawer-right);
 	}
 
 	.drawer--bottom {
@@ -215,10 +215,10 @@
 		left: 0;
 		right: 0;
 		height: auto;
-		max-height: 85vh;
+		max-height: var(--drawer-max-height, 85vh);
 		border-radius: var(--border-radius-sm) var(--border-radius-sm) 0 0;
 		border-bottom: none;
-		box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.6);
+		box-shadow: var(--shadow-drawer-top);
 	}
 
 	.drawer--top {
@@ -226,9 +226,9 @@
 		left: 0;
 		right: 0;
 		height: auto;
-		max-height: 85vh;
+		max-height: var(--drawer-max-height, 85vh);
 		border-radius: 0 0 var(--border-radius-sm) var(--border-radius-sm);
 		border-top: none;
-		box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+		box-shadow: var(--shadow-drawer-bottom);
 	}
 </style>

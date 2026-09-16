@@ -501,7 +501,7 @@
 		backdrop-filter: blur(4px);
 		border-radius: var(--border-radius-sm);
 		padding: 3px;
-		border: 1px solid rgba(255, 255, 255, 0.08);
+		border: var(--border-width) solid var(--border);
 	}
 
 	.model-btn {

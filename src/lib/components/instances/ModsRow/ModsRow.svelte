@@ -134,9 +134,7 @@
 	{/if}
 </div>
 <ModalBase bind:open={bulkDeleteModal} title={t("sidebar.modals.deleteTitle")}>
-	<p
-		style="font-size: 0.9rem; color: var(--text-secondary); line-height: 1.4;"
-	>
+	<p class="confirmation-message">
 		{t("instanceView.mods.bulkDelete")}
 	</p>
 	{#snippet footer()}
@@ -149,7 +147,7 @@
 		<button
 			type="button"
 			class="btn-primary"
-			style="background: var(--color-error); color: white;"
+			style="background: var(--color-error); color: var(--color-on-error);"
 			onclick={handleBulkDelete}>{t("sidebar.modals.deleteBtn")}</button
 		>
 	{/snippet}

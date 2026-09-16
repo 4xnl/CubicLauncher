@@ -181,7 +181,7 @@
 		align-items: center;
 		margin-top: 16px;
 		padding: 14px 16px;
-		background: rgba(255, 255, 255, 0.02);
+		background: var(--surface-subtle);
 		border: 1px solid var(--border);
 		border-radius: var(--border-radius-sm);
 	}
@@ -202,7 +202,7 @@
 		border-bottom: 1px solid var(--border);
 	}
 	.rp-queue-item {
-		background: rgba(255, 255, 255, 0.02);
+		background: var(--surface-subtle);
 		border: 1px solid var(--border);
 		padding: 10px 12px;
 		border-radius: var(--border-radius-sm);
@@ -218,7 +218,7 @@
 	}
 	.rp-queue-box {
 		flex: 1;
-		background: rgba(255, 255, 255, 0.02);
+		background: var(--surface-subtle);
 		border: 1px solid var(--border);
 		border-radius: var(--border-radius-sm);
 		padding: 16px;

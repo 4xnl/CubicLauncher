@@ -1,14 +1,14 @@
 .btn-primary {
 	background: var(--accent);
-	color: var(--bg-main);
+	color: var(--accent-text);
 	border: none;
-	padding: 8px 16px;
+	padding: var(--button-padding);
 	border-radius: var(--border-radius-sm);
-	font-size: 0.8rem;
+	font-size: var(--font-size-sm);
 
-	font-weight: 700;
+	font-weight: var(--font-weight-bold);
 	cursor: pointer;
-	transition: opacity 0.2s ease;
+	transition: opacity var(--transition-normal) ease;
 }
 
 .btn-primary:hover {
@@ -17,17 +17,17 @@
 
 .btn-secondary {
 	background: transparent;
-	border: 1px solid var(--border);
+	border: var(--border-width) solid var(--border);
 	color: var(--text-secondary);
-	padding: 8px 16px;
+	padding: var(--button-padding);
 	border-radius: var(--border-radius-sm);
-	font-size: 0.8rem;
+	font-size: var(--font-size-sm);
 
-	font-weight: 600;
+	font-weight: var(--font-weight-medium);
 	cursor: pointer;
 	transition:
-		background 0.2s ease,
-		color 0.2s ease;
+		background var(--transition-normal) ease,
+		color var(--transition-normal) ease;
 }
 
 .btn-secondary:hover {
@@ -37,16 +37,16 @@
 
 .btn-danger {
 	background: rgba(var(--color-error-rgb), 0.1);
-	border: 1px solid rgba(var(--color-error-rgb), 0.25);
+	border: var(--border-width) solid rgba(var(--color-error-rgb), 0.25);
 	color: var(--color-error);
-	padding: 8px 16px;
+	padding: var(--button-padding);
 	border-radius: var(--border-radius-sm);
-	font-size: 0.8rem;
-	font-weight: 600;
+	font-size: var(--font-size-sm);
+	font-weight: var(--font-weight-medium);
 	cursor: pointer;
 	transition:
-		background 0.2s ease,
-		color 0.2s ease;
+		background var(--transition-normal) ease,
+		color var(--transition-normal) ease;
 }
 
 .btn-danger:hover {
@@ -57,15 +57,15 @@
 	background: transparent;
 	border: none;
 	color: var(--text-secondary);
-	padding: 4px;
+	padding: var(--space-xs);
 	border-radius: var(--border-radius-sm);
 	cursor: pointer;
 	display: flex;
 	align-items: center;
 	justify-content: center;
 	transition:
-		background 0.2s ease,
-		color 0.2s ease;
+		background var(--transition-normal) ease,
+		color var(--transition-normal) ease;
 }
 
 .action-btn:hover {
@@ -84,34 +84,34 @@
 	flex-direction: column;
 	align-items: center;
 	justify-content: center;
-	gap: 14px;
+	gap: var(--empty-state-gap, 14px);
 	color: var(--text-secondary);
 	text-align: center;
-	padding: 40px;
+	padding: var(--empty-state-padding, 40px);
 }
 
 .empty-state h2 {
 	color: var(--text-primary);
-	font-size: 1.2rem;
-	font-weight: 600;
+	font-size: var(--font-size-lg);
+	font-weight: var(--font-weight-medium);
 	letter-spacing: 0.3px;
 }
 
 .empty-state p {
-	font-size: 0.8rem;
+	font-size: var(--font-size-sm);
 	color: var(--text-secondary);
 	text-transform: uppercase;
 	letter-spacing: 1px;
-	font-weight: 600;
+	font-weight: var(--font-weight-medium);
 }
 
 .section-title {
-	font-size: 0.65rem;
-	font-weight: 700;
+	font-size: var(--font-size-label);
+	font-weight: var(--font-weight-bold);
 	letter-spacing: 1.5px;
 	text-transform: uppercase;
 	color: var(--text-secondary);
-	margin-bottom: 18px;
+	margin-bottom: var(--section-title-spacing, 18px);
 	display: block;
 }
 
@@ -119,7 +119,7 @@
 	position: relative;
 	display: flex;
 	flex-direction: column;
-	gap: 6px;
+	gap: var(--input-group-gap, 6px);
 	width: 100%;
 }
 
@@ -128,18 +128,18 @@
 	align-items: center;
 	justify-content: space-between;
 	background: var(--surface-input);
-	border: 1px solid var(--border);
+	border: var(--border-width) solid var(--border);
 	border-radius: var(--border-radius-sm);
-	padding: 10px 14px;
+	padding: var(--select-padding, var(--control-padding));
 	color: var(--text-primary);
 	font-family: inherit;
-	font-size: 0.85rem;
+	font-size: var(--font-size-control);
 	cursor: pointer;
 	transition:
-		background-color 0.2s ease,
-		color 0.2s ease,
-		border-color 0.2s ease,
-		box-shadow 0.2s ease;
+		background-color var(--transition-normal) ease,
+		color var(--transition-normal) ease,
+		border-color var(--transition-normal) ease,
+		box-shadow var(--transition-normal) ease;
 	text-align: left;
 	width: 100%;
 	outline: none;
@@ -147,17 +147,17 @@
 
 .select-trigger:hover:not(.disabled) {
 	background: var(--surface-active);
-	border-color: rgba(var(--surface-rgb), 0.2);
+	border-color: var(--border-hover);
 }
 
 .select-trigger.open {
-	border-color: rgba(var(--surface-rgb), 0.3);
+	border-color: var(--border-focus);
 	background: var(--surface-active);
-	box-shadow: 0 0 0 2px rgba(var(--surface-rgb), 0.02);
+	box-shadow: var(--control-focus-shadow, 0 0 0 2px var(--surface-subtle));
 }
 
 .select-trigger.disabled {
-	opacity: 0.5;
+	opacity: var(--disabled-opacity, 0.5);
 	cursor: not-allowed;
 }
 
@@ -169,9 +169,9 @@
 
 .chevron-icon {
 	color: var(--text-secondary);
-	transition: transform 0.2s ease;
+	transition: transform var(--transition-normal) ease;
 	flex-shrink: 0;
-	margin-left: 8px;
+	margin-left: var(--space-sm);
 }
 
 .select-trigger.open .chevron-icon {
@@ -181,13 +181,13 @@
 .select-dropdown {
 	position: fixed;
 	background: var(--surface-dropdown);
-	border: 1px solid var(--border);
+	border: var(--border-width) solid var(--border);
 	border-radius: var(--border-radius-sm);
-	box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+	box-shadow: var(--shadow-floating);
 	z-index: 9999;
-	max-height: 240px;
+	max-height: var(--select-max-height, 240px);
 	overflow-y: auto;
-	padding: 6px;
+	padding: var(--select-menu-padding, 6px);
 	backdrop-filter: blur(var(--backdrop-blur-dropdown, 4px));
 }
 
@@ -195,12 +195,12 @@
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	padding: 10px 12px;
+	padding: var(--control-padding);
 	border-radius: var(--border-radius-sm);
 	color: var(--text-secondary);
-	font-size: 0.85rem;
+	font-size: var(--font-size-control);
 	cursor: pointer;
-	transition: all 0.15s ease;
+	transition: all var(--transition-fast) ease;
 	margin-bottom: 2px;
 }
 
@@ -216,8 +216,8 @@
 .select-option.selected {
 	background: var(--surface-selected);
 	color: var(--text-primary);
-	font-weight: 600;
-	border: 1px solid rgba(var(--surface-rgb), 0.05);
+	font-weight: var(--font-weight-medium);
+	border: var(--border-width) solid var(--border);
 }
 
 .check-icon {
@@ -234,7 +234,7 @@
 	color: var(--text-muted);
 	background: var(--surface-hover);
 	padding: 1px 6px;
-	border-radius: 3px;
+	border-radius: var(--border-radius-sm);
 	margin-left: 6px;
 	white-space: nowrap;
 	flex-shrink: 0;
@@ -246,7 +246,7 @@
 }
 
 .select-dropdown::-webkit-scrollbar {
-	width: 4px;
+	width: var(--scrollbar-size);
 }
 
 .select-dropdown::-webkit-scrollbar-track {
@@ -254,25 +254,25 @@
 }
 
 .select-dropdown::-webkit-scrollbar-thumb {
-	background: var(--border);
-	border-radius: 10px;
+	background: var(--scrollbar-thumb);
+	border-radius: var(--scrollbar-radius);
 }
 
 .icon-selector {
 	display: flex;
-	gap: 12px;
-	margin-top: 8px;
+	gap: var(--space-md);
+	margin-top: var(--space-sm);
 }
 
 .icon-option {
-	width: 48px;
-	height: 48px;
+	width: var(--icon-option-size, 48px);
+	height: var(--icon-option-size, 48px);
 	border-radius: var(--border-radius-sm);
 	background: var(--surface-hover);
-	border: 1px solid transparent;
+	border: var(--border-width) solid transparent;
 	cursor: pointer;
 	padding: 6px;
-	transition: all 0.2s ease;
+	transition: all var(--transition-normal) ease;
 	display: flex;
 	align-items: center;
 	justify-content: center;
@@ -296,12 +296,12 @@
 .input-group {
 	display: flex;
 	flex-direction: column;
-	gap: 6px;
+	gap: var(--input-group-gap, 6px);
 }
 
 .input-label {
-	font-size: 0.65rem;
-	font-weight: 600;
+	font-size: var(--font-size-label);
+	font-weight: var(--font-weight-medium);
 	text-transform: uppercase;
 	letter-spacing: 1px;
 	color: var(--text-secondary);
@@ -309,18 +309,18 @@
 
 .text-input {
 	background: var(--surface-input);
-	border: 1px solid var(--border);
+	border: var(--border-width) solid var(--border);
 	border-radius: var(--border-radius-sm);
-	padding: 10px 12px;
+	padding: var(--control-padding);
 	color: var(--text-primary);
 	font-family: inherit;
-	font-size: 0.85rem;
+	font-size: var(--font-size-control);
 	outline: none;
-	transition: border-color 0.2s ease;
+	transition: border-color var(--transition-normal) ease;
 }
 
 .text-input:focus {
-	border-color: rgba(var(--surface-rgb), 0.3);
+	border-color: var(--border-focus);
 }
 
 .icon-svg {

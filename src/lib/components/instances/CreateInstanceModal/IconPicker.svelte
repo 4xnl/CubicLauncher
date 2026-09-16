@@ -102,7 +102,10 @@
 		width: 56px;
 		height: 56px;
 		object-fit: contain;
-		filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+		filter: var(
+			--icon-picker-filter,
+			drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3))
+		);
 	}
 
 	.icon-preview :global(.icon-svg) {
@@ -118,7 +121,7 @@
 		height: 22px;
 		border-radius: 50%;
 		background: var(--color-error);
-		color: white;
+		color: var(--accent-text);
 		border: 2px solid var(--bg-card);
 		cursor: pointer;
 		display: flex;

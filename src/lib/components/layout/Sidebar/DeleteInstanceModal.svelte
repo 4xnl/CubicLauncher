@@ -14,9 +14,7 @@
 </script>
 
 <ModalBase bind:open title={t("sidebar.modals.deleteTitle")}>
-	<p
-		style="font-size: 0.9rem; color: var(--text-secondary); line-height: 1.4;"
-	>
+	<p class="confirmation-message">
 		{t("sidebar.modals.deleteDesc1")}
 		<strong style="color: var(--text-primary);">"{instanceName}"</strong>{t(
 			"sidebar.modals.deleteDesc2",
@@ -31,7 +29,7 @@
 		<button
 			type="button"
 			class="btn-primary"
-			style="background: var(--color-error); color: white;"
+			style="background: var(--color-error); color: var(--color-on-error);"
 			onclick={onconfirm}>{t("sidebar.modals.deleteBtn")}</button
 		>
 	{/snippet}

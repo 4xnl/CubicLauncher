@@ -6,9 +6,11 @@
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<title>CubicLauncher</title>
 		<style>
-			body {
-				background: #0c0c0c;
-				margin: 0;
+			@layer cubic {
+				body {
+					background: var(--bg-main, #0c0c0c);
+					margin: 0;
+				}
 			}
 		</style>
 		%sveltekit.head%

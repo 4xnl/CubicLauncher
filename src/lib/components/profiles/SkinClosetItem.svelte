@@ -192,13 +192,13 @@
 	.closet-card:hover {
 		transform: translateY(-2px);
 		background: var(--surface-selected);
-		box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+		box-shadow: var(--shadow-image);
 	}
 
 	.closet-card.active {
 		background: var(--surface-selected);
 		box-shadow:
-			0 4px 14px rgba(0, 0, 0, 0.2),
+			var(--shadow-image),
 			inset 0 2px 0 0 var(--accent);
 	}
 
@@ -250,10 +250,10 @@
 	}
 
 	.icon-btn {
-		background: rgba(0, 0, 0, 0.5);
+		background: var(--media-overlay);
 		backdrop-filter: blur(4px);
-		border: 1px solid rgba(255, 255, 255, 0.1);
-		color: #fff;
+		border: var(--border-width) solid var(--media-overlay-border);
+		color: var(--media-overlay-text);
 		border-radius: var(--border-radius-sm);
 		width: 22px;
 		height: 22px;
@@ -299,8 +299,8 @@
 		position: absolute;
 		bottom: 6px;
 		left: 6px;
-		background: rgba(0, 0, 0, 0.6);
-		color: #fff;
+		background: var(--media-overlay);
+		color: var(--media-overlay-text);
 		font-size: 0.55rem;
 		font-weight: 700;
 		padding: 1px 5px;

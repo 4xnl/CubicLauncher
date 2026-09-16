@@ -129,7 +129,7 @@
 		border-radius: var(--border-radius-sm);
 		font-size: 0.85rem;
 		font-family: inherit;
-		box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.2);
+		box-shadow: var(--shadow-inset);
 		box-sizing: border-box;
 		transition: border-color 0.15s;
 	}

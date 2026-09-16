@@ -164,14 +164,14 @@
 		display: flex;
 		flex-direction: column;
 		align-items: stretch;
-		gap: 12px;
-		padding: 14px;
+		gap: var(--space-md);
+		padding: var(--market-card-padding);
 		background: var(--surface-selected);
-		border: 1px solid var(--border);
+		border: var(--border-width) solid var(--border);
 		border-radius: var(--border-radius-sm);
 		transition:
-			border-color 0.15s ease,
-			background-color 0.15s ease;
+			border-color var(--transition-fast) ease,
+			background-color var(--transition-fast) ease;
 		height: 100%;
 		min-width: 0;
 		box-sizing: border-box;
@@ -185,10 +185,10 @@
 
 	.market-item-open {
 		display: grid;
-		grid-template-columns: 48px minmax(0, 1fr);
+		grid-template-columns: var(--market-icon-size) minmax(0, 1fr);
 		grid-template-rows: auto 1fr;
 		align-items: start;
-		gap: 10px;
+		gap: var(--market-item-gap, 10px);
 		flex: 1;
 		min-height: 0;
 		min-width: 0;
@@ -223,11 +223,11 @@
 	}
 
 	.market-item-icon {
-		width: 48px;
-		height: 48px;
+		width: var(--market-icon-size);
+		height: var(--market-icon-size);
 		border-radius: var(--border-radius-sm);
 		background: var(--surface-selected);
-		border: 1px solid var(--border);
+		border: var(--border-width) solid var(--border);
 		overflow: hidden;
 		flex-shrink: 0;
 		display: flex;
@@ -261,8 +261,8 @@
 	}
 
 	.market-item-title {
-		font-size: 0.9rem;
-		font-weight: 700;
+		font-size: var(--market-title-size, 0.9rem);
+		font-weight: var(--font-weight-bold);
 		color: var(--text-primary);
 		margin: 0;
 		display: -webkit-box;
@@ -316,9 +316,9 @@
 	.market-item-description {
 		grid-column: 1 / -1;
 		min-height: 0;
-		font-size: 0.75rem;
+		font-size: var(--market-description-size, 0.75rem);
 		color: var(--text-tertiary, var(--text-secondary));
-		line-height: 1.5;
+		line-height: var(--line-height);
 		display: -webkit-box;
 		-webkit-line-clamp: 2;
 		line-clamp: 2;
@@ -336,7 +336,7 @@
 		gap: 6px;
 		flex-shrink: 0;
 		padding-top: 10px;
-		border-top: 1px solid var(--border);
+		border-top: var(--border-width) solid var(--border);
 	}
 
 	.market-item-meta {
@@ -367,10 +367,10 @@
 		align-items: center;
 		justify-content: center;
 		gap: 6px;
-		padding: 5px 12px;
+		padding: var(--market-button-padding, 5px 12px);
 		background: var(--surface-input);
 		color: var(--text-primary);
-		border: 1px solid var(--border);
+		border: var(--border-width) solid var(--border);
 		border-radius: var(--border-radius-sm);
 		cursor: pointer;
 		font-size: 0.72rem;

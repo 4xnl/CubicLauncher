@@ -41,11 +41,11 @@
 		overflow-y: auto;
 		contain: layout style;
 		background: var(--bg-input);
-		padding: 4px 0;
+		padding: var(--space-xs) 0;
 	}
 
 	.log-viewport::-webkit-scrollbar {
-		width: 5px;
+		width: var(--scrollbar-size);
 	}
 
 	.log-viewport::-webkit-scrollbar-track {
@@ -54,6 +54,6 @@
 
 	.log-viewport::-webkit-scrollbar-thumb {
 		background: var(--scrollbar-thumb);
-		border-radius: 10px;
+		border-radius: var(--scrollbar-radius);
 	}
 </style>

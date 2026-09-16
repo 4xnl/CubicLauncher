@@ -171,7 +171,7 @@
 					<svg
 						viewBox="0 0 14 14"
 						fill="none"
-						stroke="rgba(255,255,255,0.9)"
+						stroke="var(--color-on-success)"
 						stroke-width="1.8"
 						stroke-linecap="round"
 						stroke-linejoin="round"
@@ -183,7 +183,7 @@
 					<svg
 						viewBox="0 0 14 14"
 						fill="none"
-						stroke="rgba(255,255,255,0.9)"
+						stroke="var(--color-on-error)"
 						stroke-width="1.6"
 						stroke-linecap="round"
 						aria-hidden="true"
@@ -194,7 +194,7 @@
 					<svg
 						viewBox="0 0 14 14"
 						fill="none"
-						stroke="rgba(255,255,255,0.9)"
+						stroke="var(--color-on-warning)"
 						stroke-width="1.6"
 						stroke-linecap="round"
 						stroke-linejoin="round"
@@ -208,7 +208,7 @@
 					<svg
 						viewBox="0 0 14 14"
 						fill="none"
-						stroke="rgba(255,255,255,0.9)"
+						stroke="var(--color-on-success)"
 						stroke-width="1.8"
 						stroke-linecap="round"
 						stroke-linejoin="round"
@@ -220,7 +220,7 @@
 					<svg
 						viewBox="0 0 14 14"
 						fill="none"
-						stroke="rgba(255,255,255,0.9)"
+						stroke="var(--color-on-info)"
 						stroke-width="1.6"
 						stroke-linecap="round"
 						aria-hidden="true"
@@ -266,15 +266,13 @@
 	.notification-toast {
 		display: flex;
 		align-items: center;
-		gap: 10px;
-		padding: 9px 16px 9px 9px;
-		border-radius: 22px;
+		gap: var(--toast-gap, 10px);
+		padding: var(--toast-padding, 9px 16px 9px 9px);
+		border-radius: var(--toast-radius, 22px);
 		background: var(--toast-bg);
 		border: 1px solid var(--toast-border);
 		border-top-color: rgba(var(--surface-rgb), 0.18);
-		box-shadow:
-			inset 0 1px 0 rgba(var(--surface-rgb), 0.07),
-			0 4px 24px rgba(0, 0, 0, 0.5);
+		box-shadow: var(--toast-shadow, var(--shadow-lg));
 
 		position: relative;
 		overflow: hidden;
@@ -293,14 +291,15 @@
 
 	.notification-toast.prominent {
 		width: max-content;
-		gap: 12px;
-		padding: 12px 18px 12px 12px;
-		border-radius: 28px;
+		gap: var(--space-md);
+		padding: var(--toast-prominent-padding, 12px 18px 12px 12px);
+		border-radius: var(--toast-prominent-radius, 28px);
 		animation-name: notificationProminentIn;
 	}
 
 	.prominent .notification-gloss {
-		border-radius: 28px 28px 0 0;
+		border-radius: var(--toast-prominent-radius, 28px)
+			var(--toast-prominent-radius, 28px) 0 0;
 	}
 
 	.prominent .notification-icon-wrap {
@@ -323,7 +322,7 @@
 	}
 
 	.prominent .notification-title {
-		font-size: 15px;
+		font-size: var(--toast-prominent-title-size, 1.0714rem);
 		font-weight: 500;
 		line-height: 1.35;
 		white-space: normal;
@@ -331,7 +330,7 @@
 	}
 
 	.prominent .notification-message {
-		font-size: 13px;
+		font-size: var(--toast-prominent-message-size, 0.9286rem);
 		line-height: 1.45;
 		white-space: pre-wrap;
 		overflow-wrap: anywhere;
@@ -340,7 +339,7 @@
 	}
 
 	.prominent .notification-sub {
-		font-size: 12px;
+		font-size: var(--toast-prominent-sub-size, 0.8571rem);
 	}
 
 	.prominent .notification-copy,
@@ -420,7 +419,7 @@
 		left: 0;
 		right: 0;
 		height: 50%;
-		border-radius: 22px 22px 0 0;
+		border-radius: var(--toast-radius, 22px) var(--toast-radius, 22px) 0 0;
 		background: linear-gradient(
 			180deg,
 			var(--surface-card) 0%,
@@ -464,9 +463,7 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		box-shadow:
-			inset 0 1px 0 rgba(var(--surface-rgb), 0.22),
-			0 2px 6px rgba(0, 0, 0, 0.4);
+		box-shadow: var(--toast-icon-shadow, var(--shadow-sm));
 		transition: background 0.4s ease;
 		overflow: hidden;
 		will-change: transform;
@@ -502,7 +499,7 @@
 	}
 
 	.notification-title {
-		font-size: 13px;
+		font-size: var(--toast-title-size, 0.9286rem);
 		font-weight: 400;
 		color: var(--text-primary);
 		letter-spacing: 0.01em;

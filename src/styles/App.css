@@ -3,9 +3,9 @@
    Component-specific CSS lives in each .svelte file's <style> block.
    ========================================================================== */
 
-@import "./shared/reset.css";
-@import "./shared/layout.css";
-@import "./shared/components.css";
-@import "./shared/modal.css";
-@import "./shared/welcome.css";
-@import "./shared/perf.css";
+@import "./shared/reset.css" layer(cubic);
+@import "./shared/layout.css" layer(cubic);
+@import "./shared/components.css" layer(cubic);
+@import "./shared/modal.css" layer(cubic);
+@import "./shared/welcome.css" layer(cubic);
+@import "./shared/perf.css" layer(cubic);

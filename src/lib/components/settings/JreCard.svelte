@@ -263,7 +263,7 @@
 		font-size: 0.85rem;
 		transition: border-color 0.2s;
 		box-sizing: border-box;
-		box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.25);
+		box-shadow: var(--shadow-inset);
 	}
 
 	.qm-field input:focus {

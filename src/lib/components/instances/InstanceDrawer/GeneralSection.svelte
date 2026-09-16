@@ -113,7 +113,7 @@
 		width: 42px;
 		height: 42px;
 		border-radius: 8px;
-		background: rgba(255, 255, 255, 0.04);
+		background: var(--surface-raised);
 		border: 2px solid var(--border-color);
 		cursor: pointer;
 		padding: 6px;
@@ -121,13 +121,13 @@
 	}
 
 	.icon-option:hover {
-		background: rgba(255, 255, 255, 0.08);
+		background: var(--surface-active);
 		border-color: var(--text-secondary);
 	}
 
 	.icon-option.selected {
 		border-color: var(--accent);
-		background: rgba(255, 255, 255, 0.1);
+		background: var(--surface-hover);
 	}
 
 	.icon-option img {

@@ -5,11 +5,15 @@
 	--bg-card: #111113;
 	--bg-input: #0a0a0a;
 	--bg-overlay: rgba(0, 0, 0, 0.7);
-	--bg-sidebar-gradient: linear-gradient(180deg, #111113 0%, #0a0a0a 100%);
+	--bg-sidebar-gradient: linear-gradient(
+		180deg,
+		var(--bg-sidebar) 0%,
+		var(--bg-main) 100%
+	);
 	--bg-card-gradient: linear-gradient(
 		135deg,
 		var(--surface-card) 0%,
-		rgba(255, 255, 255, 0) 100%
+		transparent 100%
 	);
 	--text-primary: #f4f4f5;
 	--text-secondary: #a1a1aa;
@@ -26,20 +30,59 @@
 	--surface-selected: rgba(var(--surface-rgb), 0.03);
 	--surface-card: rgba(var(--surface-rgb), 0.03);
 	--surface-input: rgba(var(--surface-rgb), 0.03);
-	--surface-dropdown: #111113;
-	--bg-surface: #18181a;
-	--toast-bg: rgba(17, 17, 19, 0.84);
+	--surface-dropdown: var(--bg-card);
+	--bg-surface: var(--bg-item-active);
+	--toast-bg: color-mix(in srgb, var(--bg-card) 84%, transparent);
 	--toast-border: rgba(var(--surface-rgb), 0.06);
-	--border-color: rgba(255, 255, 255, 0.06);
+	--border-color: rgba(var(--surface-rgb), 0.06);
 	--border: var(--border-color);
 	--border-radius: 4px;
 	--border-radius-sm: 3px;
+	--border-radius-lg: calc(var(--border-radius) * 2);
+	--border-radius-pill: 999px;
+	--border-width: 1px;
 	--sidebar-width: 260px;
+	--sidebar-compact-width: 70px;
+	--sidebar-row-height: 52px;
+	--sidebar-compact-row-height: 50px;
+	--sidebar-row-gap: 8px;
+	--version-row-height: 78px;
+	--resource-row-height: 130px;
+	--resource-row-gap: 6px;
+	--resource-card-padding: 14px 16px;
+	--resource-icon-size: 56px;
+	--market-row-height: 224px;
+	--market-grid-gap: 12px;
+	--market-card-min-width: 280px;
+	--market-grid-padding: 8px;
+	--market-card-padding: 14px;
+	--market-icon-size: 48px;
 	--shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.5);
 	--shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
 	--shadow-lg: 0 8px 28px rgba(0, 0, 0, 0.6);
 	--font-family: "Cantarell", system-ui, sans-serif;
 	--font-size-base: 14px;
+	--font-family-mono:
+		ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono",
+		Menlo, monospace;
+	--font-size-sm: 0.8rem;
+	--font-size-lg: 1.2rem;
+	--font-size-control: 0.85rem;
+	--font-size-label: 0.65rem;
+	--font-weight-normal: 400;
+	--font-weight-medium: 600;
+	--font-weight-bold: 700;
+	--line-height: 1.5;
+	--space-xs: 4px;
+	--space-sm: 8px;
+	--space-md: 12px;
+	--space-lg: 16px;
+	--space-xl: 24px;
+	--control-padding: 10px 12px;
+	--button-padding: 8px 16px;
+	--icon-scale: 1;
+	--transition-fast: 0.15s;
+	--transition-normal: 0.2s;
 	--font-loaded: 1;
 	--glow-error: 0 0 12px rgba(var(--color-error-rgb), 0.3);
 	--glow-success: 0 0 12px rgba(var(--color-success-rgb), 0.3);
@@ -48,9 +91,60 @@
 	--color-error: #ef4444;
 	--color-error-rgb: 239, 68, 68;
 	--color-warning: #eab308;
+	--color-warning-rgb: 234, 179, 8;
 	--color-info: #60a5fa;
-	--color-status-starting: #60a5fa;
-	--color-status-started: #22c55e;
+	--color-status-starting: var(--color-info);
+	--color-status-started: var(--color-success);
+	/* Legacy names remain overridable by existing themes. */
+	--error: var(--color-error);
+	--warning: var(--color-warning);
+	--color-on-error: #fff;
+	--color-on-success: #fff;
+	--color-on-info: #fff;
+	--color-on-warning: #fff;
+	--surface-subtle: rgba(var(--surface-rgb), 0.02);
+	--surface-raised: rgba(var(--surface-rgb), 0.04);
+	--border-hover: rgba(var(--surface-rgb), 0.1);
+	--border-focus: rgba(var(--surface-rgb), 0.3);
+	--shadow-inset: inset 0 1px 2px rgba(0, 0, 0, 0.2);
+	--shadow-floating: var(--shadow-lg);
+	--shadow-image: var(--shadow-md);
+	--shadow-indicator: var(--shadow-sm);
+	--shadow-drawer-left: -8px 0 32px rgba(0, 0, 0, 0.6);
+	--shadow-drawer-right: 8px 0 32px rgba(0, 0, 0, 0.6);
+	--shadow-drawer-top: 0 -8px 32px rgba(0, 0, 0, 0.6);
+	--shadow-drawer-bottom: 0 8px 32px rgba(0, 0, 0, 0.6);
+	--media-overlay: rgba(0, 0, 0, 0.6);
+	--media-overlay-text: #fff;
+	--media-overlay-border: rgba(255, 255, 255, 0.1);
+	--viewer-overlay: rgba(0, 0, 0, 0.9);
+	--tutorial-overlay: rgba(0, 0, 0, 0.5);
+	--tutorial-overlay-soft: rgba(0, 0, 0, 0.15);
+	--bg-image-brightness: 0.4;
+	--bg-image-size: cover;
+	--bg-image-position: center;
+	--download-library: #4ade80;
+	--download-asset: #60a5fa;
+	--download-native: #f59e0b;
+	--download-client: #a78bfa;
+	--download-verifying: #f472b6;
+	--download-generic: #94a3b8;
+	--download-processing: #fb923c;
+	--download-jre: #22d3ee;
+	--log-trace: var(--text-muted);
+	--log-debug: var(--text-muted);
+	--log-info: var(--text-primary);
+	--log-message: var(--text-primary);
+	--log-warn: var(--color-warning);
+	--log-error: var(--color-error);
+	--log-fatal: var(--color-error);
+	--log-launcher: var(--text-primary);
+	--log-stderr: var(--color-error);
+	--log-unknown: var(--text-tertiary);
+	--log-font-size: 0.75rem;
+	--log-line-height: var(--line-height);
+	--log-line-padding: 2px 14px;
+	--log-line-min-height: 22px;
 	--icon-filter: invert(1);
 	--clr-loader-vanilla: #78909c;
 	--clr-loader-fabric: #66bb6a;
@@ -63,8 +157,10 @@
 	--backdrop-blur-float: 4px;
 	--backdrop-blur-viewer: 2px;
 	--scrollbar-thumb-hover: var(--text-secondary);
-	--scrollbar-track: #0a0a0a;
-	--scrollbar-thumb: rgba(255, 255, 255, 0.12);
+	--scrollbar-track: var(--bg-main);
+	--scrollbar-thumb: rgba(var(--surface-rgb), 0.12);
+	--scrollbar-size: 6px;
+	--scrollbar-radius: 10px;
 }
 
 html {
@@ -79,6 +175,7 @@ html {
 
 body {
 	font-family: var(--font-family);
+	font-weight: var(--font-weight-normal);
 	background-color: var(--bg-main);
 	color: var(--text-primary);
 	overflow: hidden;
@@ -110,8 +207,8 @@ textarea,
 }
 
 ::-webkit-scrollbar {
-	width: 6px;
-	height: 6px;
+	width: var(--scrollbar-size);
+	height: var(--scrollbar-size);
 }
 
 ::-webkit-scrollbar-track {
@@ -120,7 +217,7 @@ textarea,
 
 ::-webkit-scrollbar-thumb {
 	background: var(--scrollbar-thumb, var(--border));
-	border-radius: 10px;
+	border-radius: var(--scrollbar-radius);
 }
 
 ::-webkit-scrollbar-thumb:hover {

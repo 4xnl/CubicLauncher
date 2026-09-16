@@ -230,6 +230,10 @@ La comparación anterior cargaba/decodificaba la lista completa dos veces (lectu
 - Ejecutar `bun test --conditions=browser ./tests/frontend/themes` y `cargo test -p cubiclauncher --lib theme` para comprobar cargas concurrentes, limpieza de recursos, avisos, importacion con rollback, watcher y cache de tema activo.
 - [ ] Arrastrar un `.mrpack` o `.zip` al launcher e importarlo.
 - [ ] Cambiar de tema y verificar que apliquen las variables CSS.
+- [ ] Comprobar colores de logs, descargas, notificaciones y overlays con los temas claros/oscuros y un tema custom. Los botones primarios deben usar `--accent-text`.
+- [ ] Cambiar `--sidebar-row-height`, `--version-row-height`, `--resource-row-height` y las medidas `--market-*` durante el desplazamiento: filas, columnas y altura total deben actualizarse sin solapamientos ni huecos por desincronización. Repetir con `rem` y cambiando `--font-size-base`.
+- [ ] En V2, cargar un `Inject.css` con `.market-item { padding: 20px; }` sin `!important`: debe ganar al estilo encapsulado de Svelte. Probar también variables de medidas en ese CSS y volver a un tema incluido para comprobar que se restauran los valores predeterminados.
+- [ ] Comprobar `--modal-width`, `--modal-padding`, `--icon-scale`, fuentes monoespaciadas y brillo del fondo, también con desenfoque y animaciones desactivados. Variables predeterminadas: [reset.css](src/styles/shared/reset.css).
 - [ ] Importar un theme `.zip` o `.cbth`.
 - [ ] Comparar temas V1/V2 con fondos, fuentes, iconos y `Inject.css`: deben conservar su apariencia, incluso con `injects_css` ausente o desactivado.
 - [ ] Cambiar rapidamente A -> B -> A y simular un fallo de lectura: el tema anterior debe conservarse y las cargas tardias no deben mezclar fuentes o imagenes.

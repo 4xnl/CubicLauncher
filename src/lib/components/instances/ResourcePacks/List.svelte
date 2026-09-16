@@ -236,7 +236,7 @@
 	.rp-subtabs {
 		display: flex;
 		gap: 2px;
-		background: rgba(255, 255, 255, 0.04);
+		background: var(--surface-raised);
 		border-radius: var(--border-radius-sm);
 		padding: 2px;
 		align-self: flex-start;
@@ -257,7 +257,7 @@
 
 	.rp-subtab:hover {
 		color: var(--text-primary);
-		background: rgba(255, 255, 255, 0.04);
+		background: var(--surface-raised);
 	}
 
 	.rp-subtab.active {
@@ -301,7 +301,7 @@
 
 	.pack-card {
 		/* Seria bueno agregar blur customizable. */
-		background: rgba(255, 255, 255, 0.03);
+		background: var(--surface-card);
 		border: 1px solid var(--border);
 		border-radius: var(--border-radius-sm);
 		padding: 14px;
@@ -314,9 +314,9 @@
 	}
 
 	.pack-card:hover {
-		background: rgba(255, 255, 255, 0.06);
-		border-color: rgba(255, 255, 255, 0.1);
-		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+		background: var(--surface-hover);
+		border-color: var(--border-hover);
+		box-shadow: var(--shadow-md);
 	}
 
 	.pack-card.selected {
@@ -327,7 +327,7 @@
 	.pack-icon {
 		width: 48px;
 		height: 48px;
-		background: rgba(255, 255, 255, 0.03);
+		background: var(--surface-card);
 		border: 1px solid var(--border);
 		border-radius: var(--border-radius-sm);
 		display: flex;
@@ -378,8 +378,8 @@
 		text-align: center;
 		padding: 2rem;
 		color: var(--text-secondary);
-		background: rgba(255, 255, 255, 0.02);
+		background: var(--surface-subtle);
 		border-radius: var(--border-radius-sm);
-		border: 1px dashed rgba(255, 255, 255, 0.1);
+		border: var(--border-width) dashed var(--border-hover);
 	}
 </style>

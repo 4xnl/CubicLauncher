@@ -530,9 +530,7 @@
 		cursor: pointer;
 		text-transform: uppercase;
 		letter-spacing: 0.5px;
-		box-shadow:
-			inset 0 1px 3px rgba(0, 0, 0, 0.15),
-			0 4px 15px rgba(0, 0, 0, 0.3);
+		box-shadow: var(--play-button-shadow, var(--shadow-md));
 		transition:
 			background 0.2s ease,
 			box-shadow 0.2s ease;
@@ -540,7 +538,7 @@
 
 	.launch-btn:hover:not(:disabled) {
 		background: var(--accent-hover);
-		box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+		box-shadow: var(--play-button-shadow-hover, var(--shadow-lg));
 	}
 
 	.launch-btn:active:not(:disabled) {

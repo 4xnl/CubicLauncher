@@ -111,18 +111,18 @@ export function highlightText(
 }
 
 const LEVEL_COLORS: Record<string, string> = {
-	trace: "#888",
-	debug: "#888",
-	info: "#81c784",
-	message: "#c8c8c8",
-	warn: "#ffd54f",
-	error: "#e57373",
-	fatal: "#ef5350",
-	launcher: "#82b1ff",
-	stderr: "#ff8a65",
-	unknown: "#888",
+	trace: "var(--log-trace)",
+	debug: "var(--log-debug)",
+	info: "var(--log-info)",
+	message: "var(--log-message)",
+	warn: "var(--log-warn)",
+	error: "var(--log-error)",
+	fatal: "var(--log-fatal)",
+	launcher: "var(--log-launcher)",
+	stderr: "var(--log-stderr)",
+	unknown: "var(--log-unknown)",
 };
 
 export function levelColor(level: string): string {
-	return LEVEL_COLORS[level] ?? "#888";
+	return LEVEL_COLORS[level] ?? LEVEL_COLORS.unknown;
 }

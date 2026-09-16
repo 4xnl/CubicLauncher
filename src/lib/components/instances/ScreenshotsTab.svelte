@@ -173,7 +173,7 @@
 	}
 
 	.delete-btn {
-		background: rgba(0, 0, 0, 0.6);
+		background: var(--media-overlay);
 		border: none;
 		color: var(--color-error);
 		padding: 6px;
@@ -186,7 +186,7 @@
 
 	.delete-btn:hover {
 		background: rgba(var(--color-error-rgb), 0.2);
-		color: white;
+		color: var(--media-overlay-text);
 	}
 
 	.empty-state {
@@ -205,7 +205,7 @@
 		left: 0;
 		width: 100vw;
 		height: 100vh;
-		background: rgba(0, 0, 0, 0.9);
+		background: var(--viewer-overlay);
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -223,7 +223,7 @@
 		max-width: 100%;
 		max-height: 90vh;
 		border-radius: var(--border-radius-sm);
-		box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+		box-shadow: var(--shadow-floating);
 	}
 
 	.close-btn {
@@ -232,7 +232,7 @@
 		right: -40px;
 		background: transparent;
 		border: none;
-		color: white;
+		color: var(--media-overlay-text);
 		font-size: 2rem;
 		cursor: pointer;
 	}

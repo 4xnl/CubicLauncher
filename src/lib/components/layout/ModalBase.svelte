@@ -53,7 +53,7 @@
 			role="dialog"
 			aria-modal="true"
 			tabindex="-1"
-			style={width ? `width: min(${width}, 90vw)` : undefined}
+			style:--modal-default-width={width ?? "400px"}
 			transition:fly={{ y: 20, duration: flyDuration }}
 		>
 			<div class="modal-content">
@@ -103,10 +103,10 @@
 	.modal {
 		box-sizing: border-box;
 		background: var(--bg-sidebar);
-		border: 1px solid var(--border);
+		border: var(--border-width) solid var(--border);
 		border-radius: var(--border-radius, 8px);
-		width: min(400px, 90vw);
-		max-height: 90vh;
+		width: min(var(--modal-width, var(--modal-default-width)), 90vw);
+		max-height: var(--modal-max-height, 90vh);
 		overflow-y: auto;
 		box-shadow: var(--shadow-lg, 0 20px 40px rgba(0, 0, 0, 0.4));
 		transition: width var(--resize-duration)
@@ -118,10 +118,10 @@
 	}
 
 	.modal-content {
-		padding: 24px;
+		padding: var(--modal-padding, var(--space-xl));
 		display: flex;
 		flex-direction: column;
-		gap: 20px;
+		gap: var(--modal-gap, 20px);
 	}
 
 	@media (prefers-reduced-motion: reduce) {
@@ -131,12 +131,12 @@
 	}
 
 	:global(.modal::-webkit-scrollbar) {
-		width: 6px;
+		width: var(--scrollbar-size);
 	}
 
 	:global(.modal::-webkit-scrollbar-thumb) {
-		background: var(--border);
-		border-radius: 6px;
+		background: var(--scrollbar-thumb);
+		border-radius: var(--scrollbar-radius);
 	}
 
 	.modal-header {
@@ -148,13 +148,13 @@
 	.modal-header-actions {
 		display: flex;
 		align-items: center;
-		gap: 8px;
+		gap: var(--space-sm);
 		margin-left: auto;
 	}
 
 	.modal-title {
-		font-size: 1rem;
-		font-weight: 700;
+		font-size: var(--modal-title-size, 1rem);
+		font-weight: var(--font-weight-bold);
 		letter-spacing: 0.5px;
 		color: var(--text-primary);
 	}
@@ -162,12 +162,12 @@
 	.modal-body {
 		display: flex;
 		flex-direction: column;
-		gap: 12px;
+		gap: var(--space-md);
 	}
 
 	.modal-footer {
 		display: flex;
 		justify-content: flex-end;
-		gap: 10px;
+		gap: var(--modal-footer-gap, 10px);
 	}
 </style>

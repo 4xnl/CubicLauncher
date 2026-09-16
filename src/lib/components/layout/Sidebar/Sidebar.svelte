@@ -99,7 +99,7 @@
 
 <aside class="sidebar">
 	<div class="sidebar-header" data-tutorial="sidebar-header">
-		<h1 style="font-size: 0.9rem; font-weight: bold;">CUBICLAUNCHER</h1>
+		<h1 class="sidebar-title">CUBICLAUNCHER</h1>
 	</div>
 
 	<div class="sidebar-content">
@@ -119,6 +119,7 @@
 					<VirtualList
 						items={launcherStore.loadedInstances}
 						itemHeight={52}
+						itemHeightVar="--sidebar-row-height"
 						keyFn={(i) => i.uuid}
 						hideScrollbar={true}
 					>
@@ -215,6 +216,11 @@
 />
 
 <style>
+	.sidebar-title {
+		font-size: var(--sidebar-title-size, 0.9rem);
+		font-weight: var(--font-weight-bold);
+	}
+
 	.sidebar {
 		width: var(--sidebar-width);
 		flex-shrink: 0;
@@ -222,7 +228,8 @@
 		border-right: 1px solid var(--border);
 		display: flex;
 		flex-direction: column;
-		padding: 14px 12px 0;
+		padding: var(--sidebar-padding-top, 14px) var(--sidebar-padding-x, 12px)
+			0;
 		z-index: 10;
 		user-select: none;
 		position: relative;
@@ -255,7 +262,7 @@
 		border: 1px solid var(--border);
 		color: var(--text-secondary);
 		border-radius: var(--border-radius-sm);
-		box-shadow: 0 0 6px rgba(0, 0, 0, 0.3);
+		box-shadow: var(--shadow-indicator);
 		cursor: pointer;
 		display: flex;
 		align-items: center;
@@ -326,9 +333,9 @@
 		border: 1px solid var(--border-color);
 		border-radius: var(--border-radius-sm);
 		overflow: hidden;
-		width: calc(100% + 24px);
-		margin-left: -12px;
-		margin-right: -12px;
+		width: calc(100% + 2 * var(--sidebar-padding-x, 12px));
+		margin-left: calc(-1 * var(--sidebar-padding-x, 12px));
+		margin-right: calc(-1 * var(--sidebar-padding-x, 12px));
 	}
 
 	.sidebar-sections .section-full {
@@ -379,7 +386,7 @@
 
 	@media (max-width: 650px) {
 		.sidebar {
-			width: 70px;
+			width: var(--sidebar-compact-width);
 			padding: 15px 10px;
 		}
 

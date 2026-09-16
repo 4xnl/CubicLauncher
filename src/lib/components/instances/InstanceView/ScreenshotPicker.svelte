@@ -71,7 +71,7 @@
 		left: 0;
 		right: 0;
 		bottom: 0;
-		background: rgba(0, 0, 0, 0.7);
+		background: var(--bg-overlay);
 		backdrop-filter: blur(var(--backdrop-blur-viewer, 2px));
 		display: flex;
 		align-items: center;
@@ -89,7 +89,7 @@
 		max-height: 80vh;
 		display: flex;
 		flex-direction: column;
-		box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+		box-shadow: var(--shadow-floating);
 		animation: scaleUp 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
 	}
 
@@ -156,7 +156,7 @@
 
 	.picker-item:hover {
 		border-color: var(--accent);
-		box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+		box-shadow: var(--shadow-image);
 	}
 
 	.picker-item:hover img {

@@ -7,8 +7,14 @@
 	font-family: var(--font-family);
 }
 
+.confirmation-message {
+	font-size: var(--confirmation-font-size, 0.9rem);
+	color: var(--text-secondary);
+	line-height: var(--confirmation-line-height, 1.4);
+}
+
 .qm-header {
-	padding: 20px 20px 10px 20px;
+	padding: var(--modal-header-padding, 20px 20px 10px);
 	display: flex;
 	justify-content: space-between;
 	align-items: center;
@@ -38,8 +44,8 @@
 	display: flex;
 	padding: 0 10px;
 	background: var(--bg-sidebar);
-	border-bottom: 1px solid var(--border-color);
-	gap: 4px;
+	border-bottom: var(--border-width) solid var(--border-color);
+	gap: var(--space-xs);
 }
 
 .qm-tab-btn {
@@ -47,10 +53,10 @@
 	background: none;
 	border: none;
 	color: var(--text-muted);
-	padding: 8px 4px;
+	padding: var(--tab-padding, 8px 4px);
 	cursor: pointer;
-	font-size: 0.8rem;
-	font-weight: 600;
+	font-size: var(--font-size-sm);
+	font-weight: var(--font-weight-medium);
 	border-bottom: 2px solid transparent;
 	transition: all 0.2s;
 }
@@ -66,7 +72,7 @@
 }
 
 .qm-scroll::-webkit-scrollbar {
-	width: 4px;
+	width: var(--scrollbar-size);
 }
 
 .qm-scroll::-webkit-scrollbar-track {
@@ -75,19 +81,19 @@
 
 .qm-scroll::-webkit-scrollbar-thumb {
 	background: var(--scrollbar-thumb);
-	border-radius: 10px;
+	border-radius: var(--scrollbar-radius);
 }
 
 .qm-empty-state {
 	color: var(--text-muted);
-	font-size: 0.85rem;
+	font-size: var(--font-size-control);
 	padding: 10px 0;
 }
 
 .qm-footer {
-	padding: 15px 20px;
+	padding: var(--modal-footer-padding, 15px 20px);
 	background: var(--bg-main);
-	border-top: 1px solid var(--border-color);
+	border-top: var(--border-width) solid var(--border-color);
 	display: flex;
 	justify-content: center;
 }

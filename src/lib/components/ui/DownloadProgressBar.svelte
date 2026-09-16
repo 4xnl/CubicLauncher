@@ -29,14 +29,14 @@
 	];
 
 	const SEGMENT_COLORS: Record<SegmentKey, string> = {
-		Library: "#4ade80",
-		Asset: "#60a5fa",
-		Native: "#f59e0b",
-		Client: "#a78bfa",
-		Verifying: "#f472b6",
-		Generic: "#94a3b8",
-		Processing: "#fb923c",
-		Jre: "#22d3ee",
+		Library: "var(--download-library)",
+		Asset: "var(--download-asset)",
+		Native: "var(--download-native)",
+		Client: "var(--download-client)",
+		Verifying: "var(--download-verifying)",
+		Generic: "var(--download-generic)",
+		Processing: "var(--download-processing)",
+		Jre: "var(--download-jre)",
 	};
 
 	const SEGMENT_LABELS: Record<SegmentKey, string> = {

@@ -961,7 +961,7 @@
 		background: var(--bg-input);
 		border: 1px solid var(--border-color);
 		border-radius: var(--border-radius-sm);
-		box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.25);
+		box-shadow: var(--shadow-inset);
 	}
 
 	.qm-stepper-btn {
@@ -1144,8 +1144,8 @@
 		font-size: 0.85rem;
 		resize: vertical;
 		min-height: 60px;
-		font-family: monospace;
-		box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.2);
+		font-family: var(--font-family-mono);
+		box-shadow: var(--shadow-inset);
 		box-sizing: border-box;
 	}
 
@@ -1266,7 +1266,7 @@
 		border: 1px solid var(--border-color);
 		border-radius: var(--border-radius-sm);
 		padding: 6px 10px;
-		box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.25);
+		box-shadow: var(--shadow-inset);
 		max-width: 180px;
 	}
 

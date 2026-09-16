@@ -7,10 +7,10 @@
 	transition: background 0.2s;
 }
 .tut-overlay.visible.dim {
-	background: rgba(0, 0, 0, 0.5);
+	background: var(--tutorial-overlay);
 }
 .tut-overlay.visible:not(.dim) {
-	background: rgba(0, 0, 0, 0.15);
+	background: var(--tutorial-overlay-soft);
 }
 
 .tut-spotlight {
@@ -19,15 +19,15 @@
 	top: var(--sy);
 	width: var(--sw);
 	height: var(--sh);
-	border-radius: 6px;
+	border-radius: var(--tutorial-radius, var(--border-radius));
 	pointer-events: none;
 	transition: all 0.3s;
 }
 .tut-overlay.dim .tut-spotlight {
-	box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
+	box-shadow: 0 0 0 9999px var(--tutorial-overlay);
 }
 .tut-overlay:not(.dim) .tut-spotlight {
-	box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.15);
+	box-shadow: 0 0 0 9999px var(--tutorial-overlay-soft);
 }
 
 .tut-tip {
@@ -35,15 +35,15 @@
 	left: var(--tx);
 	top: var(--ty);
 	z-index: 999;
-	width: 280px;
-	padding: 16px;
+	width: var(--tutorial-width, 280px);
+	padding: var(--space-lg);
 	display: flex;
 	flex-direction: column;
-	gap: 12px;
+	gap: var(--space-md);
 	background: var(--bg-card-gradient), var(--bg-card);
-	border: 1px solid var(--border);
+	border: var(--border-width) solid var(--border);
 	border-radius: var(--border-radius-sm);
-	box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+	box-shadow: var(--shadow-floating);
 	opacity: 0;
 	pointer-events: auto;
 	transition: opacity 0.15s;

@@ -127,7 +127,7 @@
 		width: 8px;
 		height: 8px;
 		background: var(--color-error);
-		color: white;
+		color: var(--color-on-error);
 		border-radius: 50%;
 		display: flex;
 		align-items: center;
@@ -146,7 +146,7 @@
 	}
 
 	.sd-item.error {
-		background: rgba(220, 38, 38, 0.05);
+		background: color-mix(in srgb, var(--color-error) 5%, transparent);
 	}
 
 	.sd-progress-track {

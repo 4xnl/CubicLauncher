@@ -410,7 +410,7 @@
 		position: fixed;
 		inset: 0;
 		z-index: 9999;
-		background: rgba(0, 0, 0, 0.7);
+		background: var(--bg-overlay);
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -419,7 +419,7 @@
 
 	.drag-overlay-content {
 		text-align: center;
-		color: white;
+		color: var(--media-overlay-text);
 	}
 
 	.drag-overlay-content .drag-icon {

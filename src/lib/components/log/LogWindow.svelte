@@ -261,12 +261,10 @@
 	:global(.log-line) {
 		display: flex;
 		align-items: flex-start;
-		gap: 12px;
-		padding: 2px 14px;
-		min-height: 22px;
-		font-family:
-			ui-monospace, SFMono-Regular, "SF Mono", Consolas,
-			"Liberation Mono", Menlo, monospace;
+		gap: var(--space-md);
+		padding: var(--log-line-padding);
+		min-height: var(--log-line-min-height);
+		font-family: var(--font-family-mono);
 	}
 
 	:global(.log-line.hidden) {
@@ -294,12 +292,12 @@
 	}
 
 	:global(.line-text) {
-		color: var(--text-primary);
+		color: var(--log-message);
 		white-space: pre-wrap;
 		overflow-wrap: anywhere;
 		min-width: 0;
-		font-size: 0.75rem;
-		line-height: 1.5;
+		font-size: var(--log-font-size);
+		line-height: var(--log-line-height);
 	}
 
 	:global(.line-text mark) {
@@ -310,28 +308,39 @@
 	}
 
 	:global(.log-line.warn .line-text) {
-		color: var(--color-warning);
+		color: var(--log-warn);
 	}
 
 	:global(.log-line.error .line-text) {
-		color: var(--color-error);
+		color: var(--log-error);
 	}
 
 	:global(.log-line.fatal .line-text) {
-		color: var(--color-error);
+		color: var(--log-fatal);
 		font-weight: 700;
 	}
 
 	:global(.log-line.stderr .line-text) {
-		color: var(--color-error);
+		color: var(--log-stderr);
 	}
 
-	:global(.log-line.trace .line-text),
+	:global(.log-line.trace .line-text) {
+		color: var(--log-trace);
+	}
+
 	:global(.log-line.debug .line-text) {
-		color: var(--text-muted);
+		color: var(--log-debug);
+	}
+
+	:global(.log-line.info .line-text) {
+		color: var(--log-info);
+	}
+
+	:global(.log-line.launcher .line-text) {
+		color: var(--log-launcher);
 	}
 
 	:global(.log-line.unknown .line-text) {
-		color: var(--text-tertiary);
+		color: var(--log-unknown);
 	}
 </style>

@@ -24,7 +24,7 @@ html[data-reduce-motion] .preserve-motion *::after {
 
 /* Disable blur / frosted-glass effects */
 html[data-no-blur] .background-overlay {
-	filter: brightness(0.4);
+	filter: brightness(var(--bg-image-brightness));
 }
 
 html[data-no-blur] *,
@@ -71,7 +71,7 @@ html[data-reduce-motion] .preserve-motion *::after {
 	}
 
 	.background-overlay {
-		filter: brightness(0.4) !important;
+		filter: brightness(var(--bg-image-brightness)) !important;
 	}
 
 	*,
@@ -93,7 +93,7 @@ html[data-reduce-motion] .sidebar-container {
 }
 
 html[data-reduce-motion] .background-overlay {
-	filter: brightness(0.4) !important;
+	filter: brightness(var(--bg-image-brightness)) !important;
 }
 
 html[data-reduce-motion] *,
