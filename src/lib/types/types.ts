@@ -78,6 +78,7 @@ export interface Settings {
 	show_tutorial: boolean;
 	license_accepted: boolean;
 	market_filter_collapsed: boolean;
+	prominent_notifications: boolean;
 	reduce_animations: boolean;
 	disable_blur_effects: boolean;
 	disable_infinite_animations: boolean;

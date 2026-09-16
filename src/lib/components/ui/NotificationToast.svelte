@@ -14,7 +14,10 @@
 		clearTimeout(completeTimer);
 	});
 
-	let { notification }: { notification: Notification } = $props();
+	let {
+		notification,
+		prominent = false,
+	}: { notification: Notification; prominent?: boolean } = $props();
 
 	const R = 14.1;
 	const CIRC = 2 * Math.PI * R;
@@ -25,6 +28,11 @@
 	let iconColor = $derived(typeColor(notification.type));
 
 	const hasProgress = $derived(typeof notification.progress === "number");
+	const timeout = $derived(
+		prominent && notification.timeout && notification.timeout > 0
+			? Math.max(notification.timeout, 8000)
+			: notification.timeout,
+	);
 
 	const entryDuration = $derived(animDuration(300, 50));
 	const exitDuration = $derived(animDuration(340, 50));
@@ -62,7 +70,7 @@
 		if (isDone) return;
 		isDone = true;
 		iconColor = "var(--color-success)";
-		completeTimer = setTimeout(() => dismiss(), 1400);
+		completeTimer = setTimeout(() => dismiss(), prominent ? 8000 : 1400);
 	}
 
 	$effect(() => {
@@ -76,30 +84,33 @@
 		return CIRC * (1 - (notification.progress ?? 0) / 100);
 	});
 
-	// Countdown via CSS @keyframes (no JS rAF)
+	// Animate the countdown with CSS; keep dismissal independent of motion settings.
 	const uid = Math.random().toString(36).slice(2, 8);
 	let circleEl = $state<SVGCircleElement | null>(null);
 
 	$effect(() => {
 		if (hasProgress) return;
-		if (!circleEl || !notification.timeout || notification.timeout <= 0)
-			return;
+		if (!circleEl || !timeout || timeout <= 0) return;
+		const circle = circleEl;
 
 		const style = document.createElement("style");
 		const name = `cd-${uid}`;
 		style.textContent = `@keyframes ${name} { from { stroke-dashoffset: ${CIRC}; } to { stroke-dashoffset: 0; } }`;
 		document.head.appendChild(style);
 
-		circleEl.style.animation = `${name} ${notification.timeout}ms linear forwards`;
-
-		function onEnd() {
-			dismiss();
-		}
-		circleEl.addEventListener("animationend", onEnd, { once: true });
+		circle.style.animation = `${name} ${timeout}ms linear forwards`;
+		// perf.css reduces decorative animations; this duration represents real time.
+		circle.style.setProperty(
+			"animation-duration",
+			`${timeout}ms`,
+			"important",
+		);
+		const timer = setTimeout(dismiss, timeout);
 
 		return () => {
+			clearTimeout(timer);
 			style.remove();
-			circleEl?.removeEventListener("animationend", onEnd);
+			circle.style.removeProperty("animation");
 		};
 	});
 
@@ -116,11 +127,20 @@
 <div
 	class="notification-toast"
 	class:removing
+	class:prominent
 	style="--notification-in-duration: {entryDuration}ms; --notification-out-duration: {exitDuration}ms;"
 	role="button"
 	tabindex="0"
 	onclick={dismiss}
-	onkeydown={(e) => (e.key === "Enter" || e.key === " ") && dismiss()}
+	onkeydown={(e) => {
+		if (
+			e.target === e.currentTarget &&
+			(e.key === "Enter" || e.key === " ")
+		) {
+			e.preventDefault();
+			dismiss();
+		}
+	}}
 >
 	<div class="notification-gloss" aria-hidden="true"></div>
 
@@ -266,9 +286,69 @@
 			cubic-bezier(0.2, 0.85, 0.3, 1) both;
 		pointer-events: auto;
 		will-change: transform, opacity;
+		box-sizing: border-box;
+		max-width: 100%;
+		flex-shrink: 0;
 	}
 
-	.notification-toast:hover {
+	.notification-toast.prominent {
+		width: max-content;
+		gap: 12px;
+		padding: 12px 18px 12px 12px;
+		border-radius: 28px;
+		animation-name: notificationProminentIn;
+	}
+
+	.prominent .notification-gloss {
+		border-radius: 28px 28px 0 0;
+	}
+
+	.prominent .notification-icon-wrap {
+		width: 36px;
+		height: 36px;
+	}
+
+	.prominent .notification-icon {
+		inset: 4px;
+	}
+
+	.prominent .notification-icon svg {
+		width: 15px;
+		height: 15px;
+	}
+
+	.prominent .notification-body {
+		flex: 1;
+		gap: 3px;
+	}
+
+	.prominent .notification-title {
+		font-size: 15px;
+		font-weight: 500;
+		line-height: 1.35;
+		white-space: normal;
+		overflow-wrap: anywhere;
+	}
+
+	.prominent .notification-message {
+		font-size: 13px;
+		line-height: 1.45;
+		white-space: pre-wrap;
+		overflow-wrap: anywhere;
+		max-height: 8rem;
+		overflow-y: auto;
+	}
+
+	.prominent .notification-sub {
+		font-size: 12px;
+	}
+
+	.prominent .notification-copy,
+	.notification-toast:focus-within .notification-copy {
+		opacity: 1;
+	}
+
+	.notification-toast:not(.prominent):hover {
 		background: var(--surface-hover);
 	}
 	.notification-toast:active {
@@ -279,6 +359,33 @@
 		animation: notificationOut var(--notification-out-duration, 0.32s)
 			cubic-bezier(0.4, 0, 0.6, 1) forwards;
 		pointer-events: none;
+	}
+
+	.notification-toast.prominent.removing {
+		animation-name: notificationProminentOut;
+	}
+
+	@keyframes notificationProminentIn {
+		from {
+			opacity: 0;
+			transform: translateY(-12px) scale(0.98);
+		}
+		to {
+			opacity: 1;
+			transform: translateY(0) scale(1);
+		}
+	}
+
+	@keyframes notificationProminentOut {
+		0% {
+			opacity: 1;
+			transform: translateY(0) scale(1);
+		}
+		40%,
+		100% {
+			opacity: 0;
+			transform: translateY(-8px) scale(0.98);
+		}
 	}
 
 	@keyframes notificationIn {

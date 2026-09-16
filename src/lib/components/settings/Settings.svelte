@@ -1,7 +1,11 @@
 <script lang="ts">
 	import { onMount, onDestroy } from "svelte";
 	import { invoke } from "@tauri-apps/api/core";
-	import { launcherStore } from "$lib/state/state.svelte";
+	import {
+		launcherStore,
+		showInfo,
+		removeNotification,
+	} from "$lib/state/state.svelte";
 	import { saveSettings, onAppEvent } from "$lib/api/launcherService";
 	import { openUrl } from "$lib/api/cubicApi";
 	import { t, locales, downloadLocale } from "$lib/i18n";
@@ -35,6 +39,15 @@
 
 	let saving = $state(false);
 	let savingTimer: ReturnType<typeof setTimeout> | undefined;
+	let previewNotificationId: string | undefined;
+
+	function previewNotification() {
+		if (previewNotificationId) removeNotification(previewNotificationId);
+		previewNotificationId = showInfo(
+			t("settings.launcher.testNotificationTitle"),
+			t("settings.launcher.testNotificationMessage"),
+		);
+	}
 
 	onDestroy(() => {
 		clearTimeout(savingTimer);
@@ -304,6 +317,32 @@
 							>{t("settings.launcher.openConsoleOnLaunch")}</label
 						>
 					</div>
+					<div class="qm-field-checkbox">
+						<input
+							type="checkbox"
+							id="prominent-notifications"
+							bind:checked={
+								launcherStore.settings.prominent_notifications
+							}
+							aria-describedby="prominent-notifications-hint"
+							onchange={handleSave}
+						/>
+						<label for="prominent-notifications"
+							>{t(
+								"settings.launcher.prominentNotifications",
+							)}</label
+						>
+					</div>
+					<p id="prominent-notifications-hint" class="qm-ram-hint">
+						{t("settings.launcher.prominentNotificationsHint")}
+					</p>
+					<button
+						type="button"
+						class="detect-btn"
+						onclick={previewNotification}
+					>
+						{t("settings.launcher.testNotification")}
+					</button>
 				</CollapsibleSection>
 
 				<CollapsibleSection

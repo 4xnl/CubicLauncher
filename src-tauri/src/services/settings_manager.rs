@@ -128,6 +128,8 @@ pub struct SettingsManager {
     #[serde(default)]
     pub market_filter_collapsed: bool,
     #[serde(default)]
+    pub prominent_notifications: bool,
+    #[serde(default)]
     pub reduce_animations: bool,
     #[serde(default)]
     pub disable_blur_effects: bool,
@@ -212,6 +214,7 @@ impl Default for SettingsManager {
             show_tutorial: true,
             license_accepted: false,
             market_filter_collapsed: true,
+            prominent_notifications: false,
             reduce_animations: false,
             disable_blur_effects: false,
             disable_infinite_animations: false,

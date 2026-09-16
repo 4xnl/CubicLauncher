@@ -25,6 +25,7 @@ fn test_default_values() {
     assert!(s.dirty);
     assert!(s.env_vars.is_empty());
     assert!(s.jvm_args.is_empty());
+    assert!(!s.prominent_notifications);
     assert!(!s.reduce_animations);
     assert!(!s.disable_blur_effects);
     assert!(!s.disable_infinite_animations);
@@ -98,7 +99,10 @@ fn test_migrate_ambiguous_128() {
 /// `#[serde(skip)]` por lo que siempre se deserializa como `false`.
 #[test]
 fn test_serde_roundtrip() {
-    let s = SettingsManager::default();
+    let s = SettingsManager {
+        prominent_notifications: true,
+        ..Default::default()
+    };
     let json = serde_json::to_string(&s).unwrap();
     let deserialized: SettingsManager = serde_json::from_str(&json).unwrap();
     assert_eq!(deserialized.active_user_idx, s.active_user_idx);
@@ -111,6 +115,7 @@ fn test_serde_roundtrip() {
         s.console_show_level_tags
     );
     assert_eq!(deserialized.theme, s.theme);
+    assert!(deserialized.prominent_notifications);
     assert_eq!(deserialized.reduce_animations, s.reduce_animations);
     assert_eq!(deserialized.disable_blur_effects, s.disable_blur_effects);
     assert_eq!(
@@ -123,6 +128,16 @@ fn test_serde_roundtrip() {
     );
     assert_eq!(deserialized.reduce_log_animations, s.reduce_log_animations);
     assert!(!deserialized.dirty);
+}
+
+#[test]
+fn test_legacy_settings_default_to_corner_notifications() {
+    let mut json = serde_json::to_value(SettingsManager::default()).unwrap();
+    json.as_object_mut()
+        .unwrap()
+        .remove("prominent_notifications");
+    let settings: SettingsManager = serde_json::from_value(json).unwrap();
+    assert!(!settings.prominent_notifications);
 }
 
 /// El límite del historial de consola debe quedar dentro del rango
